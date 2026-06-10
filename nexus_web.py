@@ -152,6 +152,7 @@ def stream():
         # Reconstruimos el contexto (texto simple) y agregamos el nuevo mensaje.
         api_messages = [{"role": t["role"], "content": t["text"]} for t in conv["turnos"]]
         api_messages.append({"role": "user", "content": msg})
+        api_messages = nexus.recortar_contexto(api_messages)
 
         texto_final = ""
         try:

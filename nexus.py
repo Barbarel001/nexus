@@ -48,6 +48,7 @@ MODEL = "claude-opus-4-8"
 MAX_TOKENS = 8000           # longitud maxima por respuesta
 TU_NOMBRE = "Senor"         # como quieres que Nexus te llame
 PEDIR_CONFIRMACION = True    # pedir permiso antes de ejecutar comandos / escribir archivos
+MAX_MENSAJES_CONTEXTO = 40   # tope de mensajes enviados a la API (evita exceder tokens en sesiones largas)
 
 # Archivo donde Nexus guarda lo que debe recordar (junto a este script).
 CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +106,25 @@ def construir_system_prompt() -> str:
         return BASE_PROMPT
     lista = "\n".join(f"- {n}" for n in notas)
     return BASE_PROMPT + f"\n\nESTO ES LO QUE RECUERDAS de antes (usalo con naturalidad):\n{lista}\n"
+
+
+def recortar_contexto(messages: list, max_mensajes: int = MAX_MENSAJES_CONTEXTO) -> list:
+    """Limita el historial enviado a la API para no exceder el limite de tokens en
+    sesiones largas.
+
+    Recorta SOLO en una frontera 'limpia' (un mensaje de usuario de texto), para no
+    dejar un tool_use sin su tool_result -- lo que romperia la peticion a la API.
+    Si dentro de la ventana permitida no hay una frontera limpia, conserva todo
+    (es mas seguro que cortar el hilo de herramientas a la mitad).
+    """
+    if len(messages) <= max_mensajes:
+        return messages
+    corte = len(messages) - max_mensajes
+    for i in range(corte, len(messages)):
+        m = messages[i]
+        if m.get("role") == "user" and isinstance(m.get("content"), str):
+            return messages[i:]
+    return messages
 
 
 # ============================================================
@@ -375,6 +395,7 @@ def main():
             continue
 
         messages.append({"role": "user", "content": entrada})
+        messages = recortar_contexto(messages)
 
         for _ in range(10):  # tope de seguridad de iteraciones por turno
             try:
