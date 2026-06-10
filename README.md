@@ -1,5 +1,9 @@
 # N.E.X.U.S. — AI Personal Assistant
 
+[![CI](https://github.com/Barbarel001/nexus/actions/workflows/ci.yml/badge.svg)](https://github.com/Barbarel001/nexus/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+
 A personal AI assistant built in **Python** on top of the **Claude API (Anthropic)**.
 It is a real **tool-using agent**: it holds a conversation, **remembers things across
 sessions**, tracks real freelance job listings, searches the web, and can read/write
@@ -98,6 +102,19 @@ Edit the `CONFIGURACION` section in `nexus.py`:
 | `MAX_TOKENS` | Max length per response |
 | `PEDIR_CONFIRMACION` | `False` runs commands without asking (⚠️ use with care) |
 
+## Tests
+
+The suite covers the pure logic without hitting the network or the Claude API
+(job-listing parsing is tested with a mocked HTTP layer; memory and conversation
+persistence with temp files):
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+CI runs the full suite on every push via GitHub Actions.
+
 ## Security
 
 Nexus can run commands and write files on your machine, so it **asks for confirmation**
@@ -107,9 +124,12 @@ and never published.
 
 ## Roadmap
 
-- More job sources (Workana, Upwork, r/forhire)
-- In-browser confirmation modal for system actions
-- Screenshots / demo GIF
+- [x] Test suite (pytest) + CI (GitHub Actions)
+- [x] Context-window trimming for long sessions
+- [ ] More job sources (Workana, Upwork, r/forhire)
+- [ ] In-browser confirmation modal for system actions
+- [ ] Screenshots / demo GIF
+- [ ] Persist full tool-use history in the web UI across reloads
 
 ---
 
