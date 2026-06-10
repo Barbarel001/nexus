@@ -1,0 +1,14 @@
+# Datos personales de Nexus (NO publicar)
+memoria.json
+conversaciones.json
+
+# Variables de entorno / secretos
+.env
+*.key
+
+# Basura de Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/

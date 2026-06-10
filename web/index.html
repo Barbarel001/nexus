@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@600;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0f1a; --panel:#121a28; --panel-2:#0d1420;
+    --line:rgba(148,163,184,.12); --line-2:rgba(148,163,184,.20);
+    --txt:#e6edf5; --txt-dim:#94a6bd; --txt-faint:#5f6e82;
+    --accent:#38bdf8; --accent-soft:rgba(56,189,248,.12);
+    --user-bg:rgba(56,189,248,.10); --user-bd:rgba(56,189,248,.30);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:'Inter',system-ui,'Segoe UI',Roboto,sans-serif;color:var(--txt);
+    background:radial-gradient(900px 500px at 60% -160px, rgba(56,189,248,.10), transparent 70%), var(--bg);
+    font-size:15px;
+  }
+  .shell{height:100%;display:flex}
+
+  /* ---------- Panel lateral ---------- */
+  .sidebar{width:264px;flex:0 0 auto;border-right:1px solid var(--line);
+           display:flex;flex-direction:column;padding:18px 14px;gap:14px;background:var(--panel-2)}
+  .sb-head{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+  .sb-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-faint)}
+  .sb-new{display:flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);
+          border:1px solid var(--user-bd);font-family:inherit;font-size:12.5px;font-weight:600;
+          padding:7px 12px;border-radius:9px;cursor:pointer;transition:.18s;width:100%;justify-content:center}
+  .sb-new:hover{background:rgba(56,189,248,.18)}
+  .conv-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+  .conv-list::-webkit-scrollbar{width:7px}
+  .conv-list::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px}
+  .conv{display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:9px;cursor:pointer;
+        color:var(--txt-dim);font-size:13.5px;border:1px solid transparent;transition:.15s}
+  .conv:hover{background:rgba(148,163,184,.06);color:var(--txt)}
+  .conv.active{background:var(--accent-soft);border-color:var(--user-bd);color:var(--txt)}
+  .conv .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .conv .del{flex:0 0 auto;width:20px;height:20px;border:none;background:none;color:var(--txt-faint);
+             font-size:15px;cursor:pointer;border-radius:5px;opacity:0;transition:.15s;line-height:1}
+  .conv:hover .del{opacity:.7}
+  .conv .del:hover{opacity:1;color:#f87171;background:rgba(248,113,113,.12)}
+  .sb-empty{color:var(--txt-faint);font-size:12.5px;text-align:center;padding:20px 8px}
+
+  /* ---------- Panel principal ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;padding:0 28px}
+  .row{width:100%;max-width:760px;margin:0 auto}
+  header{display:flex;align-items:center;gap:16px;padding:22px 2px 18px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;flex-direction:column;gap:3px;line-height:1}
+  .logo{font-family:'Orbitron',sans-serif;font-weight:800;font-size:22px;letter-spacing:5px;color:#f1f7fb}
+  .sub{font-size:10.5px;letter-spacing:3px;text-transform:uppercase;color:var(--txt-faint)}
+  .controls{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--txt-dim);
+         padding:6px 12px;border:1px solid var(--line);border-radius:20px}
+  .led{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .btn-ic{display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);
+          color:var(--txt-dim);font-size:14px;min-width:38px;height:34px;padding:0 10px;border-radius:9px;cursor:pointer;transition:.18s}
+  .btn-ic:hover{border-color:var(--line-2);color:var(--txt)}
+  .btn-ic.on{color:var(--accent);border-color:var(--accent)}
+
+  #chat{flex:1;overflow-y:auto;padding:30px 0;display:flex;flex-direction:column;gap:28px}
+  #chat::-webkit-scrollbar{width:8px}
+  #chat::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px}
+  .msg{display:flex;flex-direction:column;max-width:82%;animation:fade .3s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.me{align-self:flex-end;align-items:flex-end}
+  .msg.ai{align-self:flex-start;align-items:flex-start}
+  .who{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-faint);margin:0 6px 9px}
+  .body{padding:15px 18px;border-radius:var(--radius);line-height:1.7;font-size:15px;text-align:left;word-wrap:break-word;overflow-wrap:anywhere}
+  .me .body{background:var(--user-bg);border:1px solid var(--user-bd);color:#eaf6ff;border-bottom-right-radius:5px}
+  .ai .body{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .ai .body p{margin:0 0 12px} .ai .body p:last-child{margin:0}
+  .ai .body ul,.ai .body ol{margin:10px 0;padding-left:22px} .ai .body li{margin:5px 0}
+  .ai .body h1,.ai .body h2,.ai .body h3{margin:16px 0 8px;font-weight:600;line-height:1.3}
+  .ai .body a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(56,189,248,.3)}
+  .ai .body code{font-family:'JetBrains Mono',monospace;background:#0b1320;color:#9bd6ff;padding:2px 6px;border-radius:5px;font-size:13px}
+  .ai .body pre{background:#0b1320;border:1px solid var(--line);padding:14px 16px;border-radius:10px;overflow:auto;margin:12px 0}
+  .ai .body pre code{background:none;padding:0;color:#cfe9ff}
+  .cursor{display:inline-block;width:7px;height:15px;background:var(--accent);margin-left:3px;vertical-align:-2px;border-radius:1px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .status-line:not(:empty){margin-bottom:10px}
+  .tool{display:inline-flex;align-items:center;gap:9px;padding:6px 13px;font-size:12px;color:var(--accent);border:1px solid var(--line-2);border-radius:20px;background:var(--accent-soft)}
+  .tool .bars{width:38px;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--accent),transparent);background-size:220% 100%;animation:slide 1.1s linear infinite}
+  @keyframes slide{from{background-position:200% 0}to{background-position:-40% 0}}
+  .thinking{color:var(--txt-faint);font-size:14px}
+  .thinking::after{content:"";animation:dots 1.4s steps(4) infinite}
+  @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+  form{display:flex;gap:12px;align-items:center;padding:18px 0 24px;border-top:1px solid var(--line)}
+  #mic{display:flex;align-items:center;justify-content:center;width:50px;height:50px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line-2);color:var(--accent);font-size:19px;border-radius:12px;cursor:pointer;transition:.18s}
+  #mic:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
+  #mic.rec{color:#fff;background:#e11d48;border-color:#e11d48;animation:micpulse 1.1s ease-in-out infinite}
+  @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(225,29,72,.5)}50%{box-shadow:0 0 0 8px rgba(225,29,72,0)}}
+  #inp{flex:1;height:50px;background:var(--panel);border:1px solid var(--line-2);color:var(--txt);font-family:inherit;font-size:15px;padding:0 18px;border-radius:12px;outline:none;transition:.18s}
+  #inp::placeholder{color:var(--txt-faint)}
+  #inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  #send{height:50px;flex:0 0 auto;background:var(--accent);border:none;color:#04121d;font-family:inherit;font-weight:600;font-size:14px;padding:0 24px;border-radius:12px;cursor:pointer;transition:.18s}
+  #send:hover{filter:brightness(1.08)}
+  #send:disabled{opacity:.45;cursor:not-allowed}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="sb-new" id="new">＋ Nueva conversación</button>
+      <div class="sb-head"><span class="sb-title">Historial</span></div>
+      <div class="conv-list" id="convList"></div>
+    </aside>
+
+    <div class="main">
+      <header class="row">
+        <div class="brand"><div class="logo">NEXUS</div><div class="sub">Asistente IA</div></div>
+        <div class="controls">
+          <span class="badge"><span class="led"></span> En línea</span>
+          <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
+        </div>
+      </header>
+
+      <div id="chat" class="row"></div>
+
+      <form id="form" class="row" autocomplete="off">
+        <button id="mic" type="button" title="Hablar a Nexus" aria-label="Hablar">🎤</button>
+        <input id="inp" placeholder="Escribe un mensaje o pulsa el micrófono…" autofocus />
+        <button id="send" type="submit">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const form = document.getElementById('form');
+const inp  = document.getElementById('inp');
+const send = document.getElementById('send');
+const convList = document.getElementById('convList');
+let cid = null, busy = false;
+
+function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
+
+/* ---------- Conversaciones ---------- */
+async function cargarLista(){
+  const r = await fetch('/api/conversaciones');
+  const convs = await r.json();
+  convList.innerHTML = '';
+  if(!convs.length){ convList.innerHTML = '<div class="sb-empty">Sin conversaciones todavía.</div>'; return; }
+  for(const c of convs){
+    const it = document.createElement('div');
+    it.className = 'conv' + (c.id === cid ? ' active' : '');
+    it.innerHTML = '<span class="t"></span><button class="del" title="Borrar">×</button>';
+    it.querySelector('.t').textContent = c.titulo || 'Conversación';
+    it.querySelector('.t').addEventListener('click', () => abrirConv(c.id));
+    it.addEventListener('click', e => { if(!e.target.classList.contains('del')) abrirConv(c.id); });
+    it.querySelector('.del').addEventListener('click', e => { e.stopPropagation(); borrarConv(c.id); });
+    convList.appendChild(it);
+  }
+}
+
+function pinta(role, text){
+  const m = document.createElement('div'); m.className = 'msg ' + (role === 'user' ? 'me' : 'ai');
+  m.innerHTML = '<div class="who">' + (role === 'user' ? 'Tú' : 'Nexus') + '</div><div class="body"></div>';
+  const body = m.querySelector('.body');
+  if(role === 'user') body.textContent = text;
+  else { try{ body.innerHTML = marked.parse(text); }catch(_){ body.textContent = text; } }
+  chat.appendChild(m); return m;
+}
+
+async function abrirConv(id){
+  if(busy) return;
+  const r = await fetch('/api/conversacion/' + id);
+  if(!r.ok) return;
+  const c = await r.json();
+  cid = id; chat.innerHTML = '';
+  for(const t of c.turnos) pinta(t.role, t.text);
+  await cargarLista(); scrollEnd(); inp.focus();
+}
+
+async function nuevaConv(){
+  const r = await fetch('/api/nueva', {method:'POST'});
+  cid = (await r.json()).id;
+  chat.innerHTML = '';
+  await cargarLista(); inp.focus();
+}
+
+async function borrarConv(id){
+  await fetch('/api/conversacion/' + id + '/borrar', {method:'POST'});
+  if(id === cid){ await nuevaConv(); }
+  else { await cargarLista(); }
+}
+
+/* ---------- Envío + streaming ---------- */
+function addNexus(){
+  const m = document.createElement('div'); m.className = 'msg ai';
+  m.innerHTML = '<div class="who">Nexus</div><div class="status-line"></div><div class="body"><span class="thinking">procesando</span></div>';
+  chat.appendChild(m); scrollEnd(); return m;
+}
+
+function sendMessage(text, porVoz){
+  if(busy || !text.trim() || !cid) return;
+  stopSpeak();
+  const hablar = porVoz || ttsOn;
+  busy = true; send.disabled = true;
+  pinta('user', text);
+  const node = addNexus(); const body = node.querySelector('.body');
+  let raw = '', started = false, eraNueva = false;
+
+  const es = new EventSource('/api/stream?cid=' + cid + '&msg=' + encodeURIComponent(text));
+
+  es.addEventListener('delta', e => {
+    if(!started){ started = true; body.innerHTML = ''; }
+    raw += JSON.parse(e.data).text; body.textContent = raw;
+    const c = document.createElement('span'); c.className = 'cursor'; body.appendChild(c);
+    scrollEnd();
+  });
+  es.addEventListener('tool', e => {
+    node.querySelector('.status-line').innerHTML =
+      '<span class="tool"><span class="bars"></span> usando ' + JSON.parse(e.data).name + '</span>';
+    if(!started){ body.innerHTML = '<span class="thinking">procesando</span>'; }
+    scrollEnd();
+  });
+  es.addEventListener('error', e => { try{ body.textContent = '⚠ ' + JSON.parse(e.data).msg; }catch(_){ } });
+
+  const finish = (ev) => {
+    es.close();
+    node.querySelector('.status-line').innerHTML = '';
+    if(raw){ try{ body.innerHTML = marked.parse(raw); }catch(_){ body.textContent = raw; } }
+    else if(!started){ body.textContent = '(sin respuesta)'; }
+    if(hablar && body.textContent){ speak(body.textContent); }
+    try{ if(ev && ev.data && JSON.parse(ev.data).nueva) cargarLista(); }catch(_){ }
+    busy = false; send.disabled = false; inp.focus(); scrollEnd();
+  };
+  es.addEventListener('done', finish);
+  es.onerror = () => { if(busy) finish(); };
+}
+
+form.addEventListener('submit', e => { e.preventDefault(); const t = inp.value; inp.value = ''; sendMessage(t); });
+document.getElementById('new').addEventListener('click', () => { if(!busy) nuevaConv(); });
+
+/* ---------- VOZ: hablar (TTS) y escuchar (STT) ---------- */
+let ttsOn = false, voz = null;
+function elegirVoz(){ const vs = window.speechSynthesis ? speechSynthesis.getVoices() : []; voz = vs.find(v => /^es/i.test(v.lang)) || null; }
+if('speechSynthesis' in window){ elegirVoz(); speechSynthesis.onvoiceschanged = elegirVoz; }
+function speak(txt){
+  if(!('speechSynthesis' in window) || !txt) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(txt.slice(0, 4000));
+  u.lang = 'es-ES'; if(voz) u.voice = voz; u.rate = 1.05; speechSynthesis.speak(u);
+}
+function stopSpeak(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+
+const ttsBtn = document.getElementById('tts');
+ttsBtn.addEventListener('click', () => {
+  ttsOn = !ttsOn; ttsBtn.textContent = ttsOn ? '🔊' : '🔇';
+  ttsBtn.classList.toggle('on', ttsOn); if(!ttsOn) stopSpeak();
+});
+
+const micBtn = document.getElementById('mic');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, escuchando = false;
+if(SR){
+  rec = new SR(); rec.lang = 'es-ES'; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = e => { sendMessage(e.results[0][0].transcript, true); };
+  rec.onend   = () => { escuchando = false; micBtn.classList.remove('rec'); };
+  rec.onerror = () => { escuchando = false; micBtn.classList.remove('rec'); };
+  micBtn.addEventListener('click', () => {
+    if(escuchando){ rec.stop(); return; }
+    stopSpeak();
+    try{ rec.start(); escuchando = true; micBtn.classList.add('rec'); }catch(_){ }
+  });
+} else { micBtn.title = 'Tu navegador no soporta dictado por voz (usa Chrome o Edge)'; micBtn.style.opacity = .4; }
+
+/* ---------- Inicio ---------- */
+(async function init(){
+  const r = await fetch('/api/conversaciones');
+  const convs = await r.json();
+  if(convs.length){ await abrirConv(convs[0].id); }
+  else { await nuevaConv(); }
+})();
+</script>
+</body>
+</html>
