@@ -1,123 +1,116 @@
-# N.E.X.U.S. — asistente personal con IA
+# N.E.X.U.S. — AI Personal Assistant
 
-Un asistente hecho en Python sobre la API de Claude (Anthropic), con **dos
-interfaces**: una **web futurista (HUD)** en el navegador y una clásica de
-**terminal**. Conversa en español, **recuerda cosas entre sesiones**, **rastrea
-ofertas de trabajo freelance**, busca en la web, ejecuta comandos en tu PC (con
-tu permiso) y lee/escribe archivos.
+A personal AI assistant built in **Python** on top of the **Claude API (Anthropic)**.
+It is a real **tool-using agent**: it holds a conversation, **remembers things across
+sessions**, tracks real freelance job listings, searches the web, and can read/write
+files and run commands on your machine (always with your confirmation).
 
-Es **lo real** detrás de los anuncios de "IA que hace todo": un agente que usa un
-modelo de lenguaje + herramientas. Útil como **copiloto**, no una máquina mágica
-de hacer dinero solo.
+It ships with **two interfaces**: a classic **terminal** client and a **web HUD**
+(browser) with streaming responses, conversation history, and voice in/out.
+
+> This is what's actually behind the "AI that does everything" hype: a language model
+> wired to a set of tools through an agentic loop. A copilot, not a magic money machine.
 
 ---
 
-## 1. Requisitos
+## Why this project
 
-- **Python 3.9+** (ya instalado: 3.12).
-- Una **API key de Anthropic** (pago por uso).
+It's a compact but complete example of an **agentic application**, demonstrating:
 
-## 2. Conseguir la API key
+- **Agentic tool-use loop** — the model decides which tool to call, the app executes
+  it, feeds the result back, and repeats until the task is done.
+- **Function calling / tool definitions** against the Anthropic API.
+- **Persistent memory** across sessions (long-term notes the agent writes itself).
+- **Streaming** responses over **Server-Sent Events (SSE)** in the web UI.
+- **Adaptive thinking**, safe-by-default permissions, and a clean separation between
+  the terminal (full tools) and web (read-only tools) surfaces.
 
-1. Entra a **https://console.anthropic.com**
-2. Crea cuenta y añade saldo (con $5 experimentas mucho).
-3. **API Keys → Create Key** y copia la clave (`sk-ant-...`).
+## Features
 
-## 3. Instalación
+| Area | What it does |
+|---|---|
+| 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
+| 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`. |
+| 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive and RemoteOK by keyword. |
+| 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open/delete), markdown rendering. |
+| 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
+| 🖥️ **Terminal client** | Full agent with the complete tool set and an iteration safety cap per turn. |
+| 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools entirely. |
 
-```powershell
+## Architecture
+
+```
+nexus.py          → Terminal agent: agentic loop + tool dispatch + adaptive thinking
+nexus_web.py      → Flask server: SSE streaming, conversation persistence, web-safe tools
+web/index.html    → HUD front-end: streaming render, history sidebar, voice (TTS/STT)
+memoria.json      → Long-term memory (git-ignored; personal)
+conversaciones.json → Web chat history (git-ignored; personal)
+```
+
+The web layer **reuses** the agent logic and tool implementations from `nexus.py`,
+exposing only the read-only tools (`recordar`, `rastrear_ofertas`, `read_file`,
+`list_directory`) — `run_command` and `write_file` are disabled in the browser for safety.
+
+## Tech stack
+
+- **Python 3.9+** (developed on 3.12)
+- **`anthropic`** SDK — Claude API, tool use, streaming, adaptive thinking
+- **Flask** — web server and SSE endpoint
+- Vanilla JS front-end + **Web Speech API** for voice
+
+---
+
+## Getting started
+
+**1. Install dependencies**
+```bash
 pip install -r requirements.txt
 ```
 
-## 4. Configurar la API key
-
-```powershell
-setx ANTHROPIC_API_KEY "sk-ant-aqui-tu-clave"
+**2. Set your Anthropic API key** (get one at https://console.anthropic.com)
+```bash
+setx ANTHROPIC_API_KEY "sk-ant-..."   # Windows — reopen the terminal afterwards
+# export ANTHROPIC_API_KEY="sk-ant-..."  # macOS / Linux
 ```
 
-Cierra y reabre la terminal.
+The key is read **only** from the environment variable — it is never stored in the code.
 
-## 5. Ejecutar
-
-**Interfaz web (HUD) — recomendada:**
-
-```powershell
-cd C:\Users\17863\nexus
-python nexus_web.py
+**3. Run it**
+```bash
+python nexus_web.py   # web HUD at http://127.0.0.1:5000 (recommended)
+python nexus.py       # terminal client (full tool set)
 ```
 
-Se abre sola en el navegador (http://127.0.0.1:5000), con estética HUD y
-respuestas en streaming. En la web, por seguridad, NO se ejecutan comandos del
-sistema ni se escriben archivos (usa la terminal para eso).
+## Example prompts
 
-**Interfaz de terminal (con todas las herramientas):**
+- "Track freelance jobs for Python and Telegram bots."
+- "Remember that my rate is 20 USD/hour."
+- "How much free RAM do I have right now?"
+- "Search the web for the latest Godot 4 news and summarize it."
 
-```powershell
-python nexus.py
-```
+## Configuration
 
-Para salir de la terminal: `salir`.
+Edit the `CONFIGURACION` section in `nexus.py`:
 
-### Doble clic
-
-El acceso directo **Nexus** del Escritorio abre la **interfaz web**.
-(`nexus_web.bat` = web · `nexus.bat` = terminal, ambos en esta carpeta.)
-
----
-
-## Qué le puedes pedir
-
-- "Rastrea ofertas freelance de Python y bots de Telegram."
-- "Recuerda que mi tarifa es 20 USD/hora."
-- "¿Cuánta RAM libre tengo ahora mismo?"
-- "Busca en la web las novedades de Godot 4 y resúmemelas."
-- "Crea un archivo propuesta.txt para este cliente: ..."
-
-Cuando quiera **ejecutar un comando** o **escribir un archivo**, te pedirá permiso
-(`s/N`). Nada se ejecuta sin tu OK.
-
----
-
-## Herramientas que tiene Nexus
-
-| Herramienta | Qué hace |
+| Variable | Purpose |
 |---|---|
-| `recordar` | Memoria persistente entre sesiones (`memoria.json`) |
-| `rastrear_ofertas` | Baja ofertas reales de Remotive y RemoteOK por palabras clave |
-| `web_search` | Busca información actual en internet |
-| `run_command` | Ejecuta comandos de PowerShell (con confirmación) |
-| `read_file` / `write_file` / `list_directory` | Trabaja con archivos |
+| `MODEL` | Claude model to use (`claude-opus-4-8` default; `sonnet`/`haiku` are cheaper) |
+| `MAX_TOKENS` | Max length per response |
+| `PEDIR_CONFIRMACION` | `False` runs commands without asking (⚠️ use with care) |
 
-## Ajustes (edita `nexus.py`, sección CONFIGURACION)
+## Security
 
-| Variable | Para qué |
-|---|---|
-| `MODEL` | Modelo a usar (ver costos abajo) |
-| `TU_NOMBRE` | Cómo te llama Nexus |
-| `MAX_TOKENS` | Largo máximo de cada respuesta |
-| `PEDIR_CONFIRMACION` | `False` = ejecuta sin pedir permiso (⚠️ con cuidado) |
+Nexus can run commands and write files on your machine, so it **asks for confirmation**
+before doing so. Read the command before approving. In the web UI those tools are
+disabled entirely. Personal data (`memoria.json`, `conversaciones.json`) is git-ignored
+and never published.
 
-## Costos (pago por uso, por millón de tokens)
+## Roadmap
 
-| Modelo | Entrada | Salida | Cuándo |
-|---|---|---|---|
-| `claude-opus-4-8` | $5 | $25 | El más capaz (por defecto) |
-| `claude-sonnet-4-6` | $3 | $15 | Casi tan bueno, más barato |
-| `claude-haiku-4-5` | $1 | $5 | El más rápido y barato |
-
-Una sesión normal cuesta céntimos.
+- More job sources (Workana, Upwork, r/forhire)
+- In-browser confirmation modal for system actions
+- Screenshots / demo GIF
 
 ---
 
-## ⚠️ Seguridad
-
-Nexus puede ejecutar comandos en tu PC. Por eso pide confirmación antes de
-ejecutar o escribir. Lee el comando antes de aceptar.
-
----
-
-## Ideas para mejorarlo
-
-- **Voz**: texto-a-voz (que hable) y voz-a-texto (hablarle tú).
-- **Más fuentes de ofertas**: Workana, Upwork, r/forhire.
-- **Confirmación en la web**: permitir acciones de sistema con un modal en el HUD.
+*Built with the Claude API. UI text is in Spanish; the assistant converses in Spanish.*
