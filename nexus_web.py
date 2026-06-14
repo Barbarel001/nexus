@@ -245,6 +245,7 @@ def stream():
 
         texto_final = ""
         tin = tout = 0
+        tools_usados = []
         try:
             for _ in range(10):
                 _kw = dict(model=model, max_tokens=nexus.MAX_TOKENS, system=system_prompt,
@@ -273,6 +274,7 @@ def stream():
                     for b in final.content:
                         if b.type != "tool_use":
                             continue
+                        tools_usados.append(b.name)
                         if b.name in PELIGROSAS and WEB_ACCIONES:
                             # --- Handshake de confirmacion con el navegador ---
                             rid = uuid.uuid4().hex[:10]
@@ -308,7 +310,8 @@ def stream():
 
         # Persistimos el turno (texto simple, suficiente para mostrar y continuar).
         conv["turnos"].append({"role": "user", "text": msg})
-        conv["turnos"].append({"role": "assistant", "text": texto_final})
+        conv["turnos"].append({"role": "assistant", "text": texto_final,
+                               "tools": list(dict.fromkeys(tools_usados))})
         guardar_convs(data)
 
         if tin or tout:
