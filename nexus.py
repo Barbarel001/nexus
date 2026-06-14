@@ -52,6 +52,10 @@ def _env(nombre: str, defecto: str) -> str:
 # TODO es configurable por variables de entorno NEXUS_* (sin tocar el codigo).
 MODEL = _env("NEXUS_MODEL", "claude-opus-4-8")
 
+# Backend del modelo: "claude" (API de Anthropic, por defecto) u "ollama" (modelo
+# LOCAL en tu PC, coste $0). Con ollama no se consumen tokens de la API.
+BACKEND = _env("NEXUS_BACKEND", "claude").lower()
+
 MAX_TOKENS = int(_env("NEXUS_MAX_TOKENS", "8000"))             # longitud maxima por respuesta
 TU_NOMBRE = _env("NEXUS_NOMBRE", "Senor")                      # como quieres que Nexus te llame
 PEDIR_CONFIRMACION = _env("NEXUS_CONFIRMAR", "1").lower() not in ("0", "false", "no")  # permiso antes de comandos/escritura
@@ -357,6 +361,22 @@ def tool_rastrear_ofertas(args: dict) -> str:
     except Exception as e:
         ofertas.append(f"(Arbeitnow no disponible ahora: {e})")
 
+    # --- Fuente 4: Jobicy (job board remoto; filtra por palabra clave EN EL SERVIDOR) ---
+    try:
+        tag = urllib.parse.quote(palabras[0] if palabras else consulta)
+        jurl = f"https://jobicy.com/api/v2/remote-jobs?count=50&tag={tag}"
+        req = urllib.request.Request(jurl, headers=headers)
+        with urllib.request.urlopen(req, timeout=25) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+        n = 0
+        for j in (data.get("jobs", []) if isinstance(data, dict) else []):
+            if _agregar("Jobicy", j.get("jobTitle"), j.get("companyName"), j.get("url")):
+                n += 1
+            if n >= 12:
+                break
+    except Exception as e:
+        ofertas.append(f"(Jobicy no disponible ahora: {e})")
+
     utiles = [o for o in ofertas if not o.startswith("(")]
     if not utiles:
         return ("No encontre ofertas con esas palabras (o las fuentes no respondieron). "
@@ -491,7 +511,16 @@ def main():
             if _th:
                 kwargs["thinking"] = _th
             try:
-                response = client.messages.create(**kwargs)
+                with client.messages.stream(**kwargs) as stream:
+                    primera = True
+                    for texto in stream.text_stream:
+                        if primera:
+                            print("\nNexus > ", end="", flush=True)
+                            primera = False
+                        print(texto, end="", flush=True)
+                    if not primera:
+                        print()
+                    response = stream.get_final_message()
             except anthropic.APIError as e:
                 print(f"\n[Error de la API: {e}]")
                 break
@@ -499,10 +528,6 @@ def main():
             if getattr(response, "usage", None):
                 turno_in += response.usage.input_tokens
                 turno_out += response.usage.output_tokens
-
-            for block in response.content:
-                if block.type == "text":
-                    print(f"\nNexus > {block.text}")
 
             messages.append({"role": "assistant", "content": response.content})
 

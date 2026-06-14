@@ -105,6 +105,7 @@
   .act{background:none;border:1px solid var(--line);color:var(--txt-faint);font-family:inherit;font-size:11.5px;
        padding:3px 9px;border-radius:7px;cursor:pointer;transition:.15s}
   .act:hover{color:var(--txt);border-color:var(--line-2)}
+  .hist-tools{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 9px}
 
   form{display:flex;gap:12px;align-items:center;padding:18px 0 24px;border-top:1px solid var(--line)}
   #mic{display:flex;align-items:center;justify-content:center;width:50px;height:50px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line-2);color:var(--accent);font-size:19px;border-radius:12px;cursor:pointer;transition:.18s}
@@ -305,12 +306,17 @@ function adornarAI(node, getText, conRegenerar){
   node.appendChild(acts);
 }
 
-function pinta(role, text, ultimo){
+function pinta(role, text, ultimo, tools){
   const m = document.createElement('div'); m.className = 'msg ' + (role === 'user' ? 'me' : 'ai');
   m.innerHTML = '<div class="who">' + (role === 'user' ? 'Tú' : 'Nexus') + '</div><div class="body"></div>';
   const body = m.querySelector('.body');
   if(role === 'user') body.textContent = text;
   else { try{ body.innerHTML = marked.parse(text); }catch(_){ body.textContent = text; } }
+  if(role !== 'user' && tools && tools.length){
+    const ht = document.createElement('div'); ht.className = 'hist-tools';
+    tools.forEach(t => { const s = document.createElement('span'); s.className = 'tool'; s.textContent = '⚙ ' + t; ht.appendChild(s); });
+    m.insertBefore(ht, body);
+  }
   chat.appendChild(m);
   if(role !== 'user') adornarAI(m, () => text, !!ultimo);
   return m;
@@ -325,7 +331,7 @@ async function abrirConv(id){
   const turnos = c.turnos || [];
   turnos.forEach((t, i) => {
     if(t.role === 'user') lastUserMsg = t.text;
-    pinta(t.role, t.text, t.role === 'assistant' && i === turnos.length - 1);
+    pinta(t.role, t.text, t.role === 'assistant' && i === turnos.length - 1, t.tools);
   });
   renderLista(); scrollEnd(); inp.focus();
 }
@@ -404,8 +410,10 @@ function sendMessage(text, porVoz, opts){
 
 function pintaCosto(node, u){
   const tot = (u.in||0) + (u.out||0);
-  const corto = (u.modelo||'').split('-')[1] || '';
-  const cst = (u.costo < 0.001) ? '<$0.001' : ('~$' + Number(u.costo).toFixed(u.costo < 0.01 ? 5 : 4));
+  const m = (u.modelo||'');
+  const corto = m.startsWith('claude-') ? m.split('-')[1] : m;   // 'opus' o 'qwen2.5:7b'
+  const cst = (u.costo === 0) ? '$0 (local)'
+            : (u.costo < 0.001 ? '<$0.001' : '~$' + Number(u.costo).toFixed(u.costo < 0.01 ? 5 : 4));
   const d = document.createElement('div'); d.className = 'meta';
   d.textContent = (corto ? corto + ' · ' : '') + tot.toLocaleString() + ' tok · ' + cst;
   node.appendChild(d);
@@ -473,6 +481,10 @@ document.getElementById('settings').addEventListener('click', () => {
   (cfg.modelos.length ? cfg.modelos : [cfg.modelo]).forEach(mid => {
     const o = document.createElement('option'); o.value = mid; o.textContent = ETIQ[mid] || mid; sel.appendChild(o);
   });
+  if(cfg.ollama_disponible){
+    const o = document.createElement('option'); o.value = 'ollama';
+    o.textContent = '🖥️ Local: ' + (cfg.ollama_model || 'modelo') + ' — gratis $0'; sel.appendChild(o);
+  }
   sel.value = SET.model;
   document.getElementById('setNombre').value = SET.nombre;
   document.getElementById('setTts').checked = SET.tts;

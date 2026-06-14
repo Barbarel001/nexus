@@ -37,13 +37,14 @@ It's a compact but complete example of an **agentic application**, demonstrating
 |---|---|
 | 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`. |
-| 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive and RemoteOK by keyword. |
+| 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
 | ✅ **In-browser confirmation** | Optional web system actions (run commands / write files) gated behind an explicit approval modal. |
-| 🖥️ **Terminal client** | Full agent with the complete tool set and an iteration safety cap per turn. |
+| 🆓 **Local model (free)** | Optional **Ollama** backend: runs a model on your own machine (Qwen2.5 / Llama 3.1) with tool-use + streaming, **$0 — no API tokens**. Pick it from ⚙ Settings. |
+| 🖥️ **Terminal client** | Full agent with the complete tool set, **streaming** responses and an iteration safety cap per turn. |
 | 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools unless explicitly opted in. |
 
 ## Architecture
@@ -51,6 +52,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 ```
 nexus.py          → Terminal agent: agentic loop + tool dispatch + adaptive thinking
 nexus_web.py      → Flask server: SSE streaming, conversation persistence, web-safe tools
+nexus_ollama.py   → Optional LOCAL backend (Ollama): runs a model on your PC, $0 / no API tokens
 web/index.html    → HUD front-end: streaming render, history sidebar, voice (TTS/STT)
 memoria.json      → Long-term memory (git-ignored; personal)
 conversaciones.json → Web chat history (git-ignored; personal)
@@ -111,8 +113,29 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_CONFIRMAR` | `1` | `0` runs terminal commands without asking (⚠️ use with care) |
 | `NEXUS_WEB_ACCIONES` | `0` | `1` enables system actions in the web UI (always behind the confirmation modal) |
 | `NEXUS_PORT` | `5000` | Web server port |
+| `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
+| `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
+
+## Local model (zero API cost)
+
+Don't want to spend API tokens? Nexus can run on a **local model** via
+[Ollama](https://ollama.com) — fully free, private and offline.
+
+```bash
+# 1. Install Ollama (https://ollama.com), then pull a tool-capable model:
+ollama pull qwen2.5:7b        # or llama3.1:8b
+
+# 2a. Use it for everything:
+setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
+
+# 2b. ...or just pick "Local — free $0" from the web ⚙ Settings (no restart).
+```
+
+In local mode **no API key is required** and every turn costs **$0**. Tool-use and
+streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
 
 ## Tests
 
@@ -144,8 +167,11 @@ never published.
 - [x] Token & cost meter per turn
 - [x] Model picker, settings panel, conversation rename / search / export
 - [x] UI mockup in the README
-- [ ] More job sources (added Arbeitnow; next: Workana, Upwork, r/forhire)
-- [ ] Persist full tool-use history in the web UI across reloads
+- [x] More job sources — Remotive, RemoteOK, Arbeitnow, Jobicy (next: Workana, Upwork, r/forhire)
+- [x] Streaming responses in the terminal client
+- [x] Tool-use chips shown when reopening a conversation
+- [x] Local model backend (Ollama) — $0, no API tokens
+- [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 
 ---
