@@ -4,6 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 
+![Nexus — web HUD](docs/nexus-hero.svg)
+
 A personal AI assistant built in **Python** on top of the **Claude API (Anthropic)**.
 It is a real **tool-using agent**: it holds a conversation, **remembers things across
 sessions**, tracks real freelance job listings, searches the web, and can read/write
@@ -36,10 +38,13 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`. |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive and RemoteOK by keyword. |
-| 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open/delete), markdown rendering. |
+| 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
+| 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
+| 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
+| ✅ **In-browser confirmation** | Optional web system actions (run commands / write files) gated behind an explicit approval modal. |
 | 🖥️ **Terminal client** | Full agent with the complete tool set and an iteration safety cap per turn. |
-| 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools entirely. |
+| 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools unless explicitly opted in. |
 
 ## Architecture
 
@@ -51,9 +56,10 @@ memoria.json      → Long-term memory (git-ignored; personal)
 conversaciones.json → Web chat history (git-ignored; personal)
 ```
 
-The web layer **reuses** the agent logic and tool implementations from `nexus.py`,
-exposing only the read-only tools (`recordar`, `rastrear_ofertas`, `read_file`,
-`list_directory`) — `run_command` and `write_file` are disabled in the browser for safety.
+The web layer **reuses** the agent logic and tool implementations from `nexus.py`.
+By default it exposes only the read-only tools (`recordar`, `rastrear_ofertas`, `read_file`,
+`list_directory`); `run_command` and `write_file` are disabled in the browser unless you set
+`NEXUS_WEB_ACCIONES=1`, in which case each call must be approved in a confirmation modal.
 
 ## Tech stack
 
@@ -94,13 +100,19 @@ python nexus.py       # terminal client (full tool set)
 
 ## Configuration
 
-Edit the `CONFIGURACION` section in `nexus.py`:
+Everything is configurable via **environment variables** (no need to edit the code):
 
-| Variable | Purpose |
-|---|---|
-| `MODEL` | Claude model to use (`claude-opus-4-8` default; `sonnet`/`haiku` are cheaper) |
-| `MAX_TOKENS` | Max length per response |
-| `PEDIR_CONFIRMACION` | `False` runs commands without asking (⚠️ use with care) |
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXUS_MODEL` | `claude-opus-4-8` | Claude model (`claude-sonnet-4-6` / `claude-haiku-4-5` are cheaper) |
+| `NEXUS_NOMBRE` | `Senor` | How Nexus addresses you |
+| `NEXUS_MAX_TOKENS` | `8000` | Max length per response |
+| `NEXUS_MAX_NOTAS` | `200` | Cap on long-term memory notes (FIFO) |
+| `NEXUS_CONFIRMAR` | `1` | `0` runs terminal commands without asking (⚠️ use with care) |
+| `NEXUS_WEB_ACCIONES` | `0` | `1` enables system actions in the web UI (always behind the confirmation modal) |
+| `NEXUS_PORT` | `5000` | Web server port |
+
+In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
 ## Tests
 
@@ -119,17 +131,22 @@ CI runs the full suite on every push via GitHub Actions.
 
 Nexus can run commands and write files on your machine, so it **asks for confirmation**
 before doing so. Read the command before approving. In the web UI those tools are
-disabled entirely. Personal data (`memoria.json`, `conversaciones.json`) is git-ignored
-and never published.
+**disabled by default**; enable them with `NEXUS_WEB_ACCIONES=1`, and every system action
+still requires explicit approval in an in-browser confirmation modal. The server binds to
+`127.0.0.1` only. Personal data (`memoria.json`, `conversaciones.json`) is git-ignored and
+never published.
 
 ## Roadmap
 
 - [x] Test suite (pytest) + CI (GitHub Actions)
 - [x] Context-window trimming for long sessions
-- [ ] More job sources (Workana, Upwork, r/forhire)
-- [ ] In-browser confirmation modal for system actions
-- [ ] Screenshots / demo GIF
+- [x] In-browser confirmation modal for system actions (opt-in)
+- [x] Token & cost meter per turn
+- [x] Model picker, settings panel, conversation rename / search / export
+- [x] UI mockup in the README
+- [ ] More job sources (added Arbeitnow; next: Workana, Upwork, r/forhire)
 - [ ] Persist full tool-use history in the web UI across reloads
+- [ ] Animated demo GIF
 
 ---
 

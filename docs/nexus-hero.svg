@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 580" font-family="'Inter','Segoe UI',Roboto,system-ui,sans-serif">
+  <defs>
+    <radialGradient id="glow" cx="62%" cy="-6%" r="70%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.16"/>
+      <stop offset="70%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ventana -->
+  <rect x="8" y="8" width="904" height="564" rx="18" fill="#0a0f1a" stroke="#1e293b" stroke-width="1.5"/>
+  <rect x="8" y="8" width="904" height="564" rx="18" fill="url(#glow)"/>
+
+  <!-- Barra de titulo -->
+  <circle cx="36" cy="36" r="6" fill="#ff5f56"/>
+  <circle cx="56" cy="36" r="6" fill="#ffbd2e"/>
+  <circle cx="76" cy="36" r="6" fill="#27c93f"/>
+  <text x="460" y="40" text-anchor="middle" fill="#5f6e82" font-size="12" letter-spacing="1">127.0.0.1:5000  —  NEXUS</text>
+
+  <!-- ============ Sidebar ============ -->
+  <rect x="8" y="58" width="230" height="514" fill="#0d1420"/>
+  <line x1="238" y1="58" x2="238" y2="572" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- boton nueva -->
+  <rect x="26" y="78" width="194" height="36" rx="9" fill="#0e2233" stroke="#1d597a"/>
+  <text x="123" y="101" text-anchor="middle" fill="#38bdf8" font-size="13" font-weight="600">＋ Nueva conversación</text>
+  <!-- buscador -->
+  <rect x="26" y="124" width="194" height="32" rx="9" fill="#121a28" stroke="#1e293b"/>
+  <text x="40" y="145" fill="#5f6e82" font-size="12.5">🔍 Buscar…</text>
+
+  <text x="30" y="180" fill="#5f6e82" font-size="10.5" letter-spacing="2">HISTORIAL</text>
+
+  <!-- items -->
+  <rect x="22" y="192" width="202" height="38" rx="9" fill="#0e2233" stroke="#1d4d6b"/>
+  <text x="36" y="216" fill="#e6edf5" font-size="13">Ofertas de bots en Python</text>
+  <text x="36" y="256" fill="#94a6bd" font-size="13">Plan de negocio freelance</text>
+  <text x="36" y="296" fill="#94a6bd" font-size="13">Resumen de noticias IA</text>
+  <text x="36" y="336" fill="#94a6bd" font-size="13">Script para renombrar fotos</text>
+  <text x="36" y="376" fill="#94a6bd" font-size="13">Tarifas por hora</text>
+
+  <text x="123" y="552" text-anchor="middle" fill="#3c4859" font-size="10.5">5 conversaciones</text>
+
+  <!-- ============ Main ============ -->
+  <!-- header -->
+  <text x="270" y="96" fill="#f1f7fb" font-size="26" font-weight="800" letter-spacing="5" font-family="'Orbitron','Inter',sans-serif">NEXUS</text>
+  <text x="271" y="114" fill="#5f6e82" font-size="10" letter-spacing="3">ASISTENTE IA</text>
+
+  <!-- badge + iconos -->
+  <rect x="690" y="78" width="92" height="28" rx="14" fill="none" stroke="#1e293b"/>
+  <circle cx="708" cy="92" r="4" fill="#34d399"/>
+  <text x="720" y="96" fill="#94a6bd" font-size="12">En línea</text>
+  <rect x="790" y="78" width="30" height="28" rx="8" fill="none" stroke="#1e293b"/><text x="805" y="97" text-anchor="middle" font-size="13">⬇</text>
+  <rect x="826" y="78" width="30" height="28" rx="8" fill="none" stroke="#1e293b"/><text x="841" y="97" text-anchor="middle" font-size="13">⚙</text>
+  <rect x="862" y="78" width="30" height="28" rx="8" fill="none" stroke="#1e293b"/><text x="877" y="97" text-anchor="middle" font-size="13">🔊</text>
+  <line x1="270" y1="126" x2="892" y2="126" stroke="#1e293b"/>
+
+  <!-- mensaje usuario -->
+  <rect x="520" y="150" width="372" height="46" rx="14" fill="#0e2233" stroke="#1d597a"/>
+  <text x="540" y="178" fill="#eaf6ff" font-size="13.5">¿Qué oportunidades hay para bots de Python?</text>
+
+  <!-- chip herramienta -->
+  <rect x="270" y="216" width="210" height="28" rx="14" fill="#0e2233" stroke="#1d4d6b"/>
+  <rect x="284" y="227" width="34" height="6" rx="3" fill="url(#bar)"/>
+  <text x="330" y="234" fill="#38bdf8" font-size="12">usando rastrear_ofertas</text>
+
+  <!-- respuesta nexus -->
+  <rect x="270" y="256" width="468" height="150" rx="14" fill="#121a28" stroke="#1e293b"/>
+  <text x="290" y="284" fill="#cfe0ee" font-size="13.5">Encontré 3 ofertas reales que encajan contigo:</text>
+  <circle cx="294" cy="308" r="2.5" fill="#38bdf8"/>
+  <text x="306" y="312" fill="#aebfd2" font-size="13"><tspan fill="#9bd6ff">[Remotive]</tspan> Python Automation Engineer — Acme</text>
+  <circle cx="294" cy="332" r="2.5" fill="#38bdf8"/>
+  <text x="306" y="336" fill="#aebfd2" font-size="13"><tspan fill="#9bd6ff">[RemoteOK]</tspan> Telegram Bot Developer — Gamma</text>
+  <circle cx="294" cy="356" r="2.5" fill="#38bdf8"/>
+  <text x="306" y="360" fill="#aebfd2" font-size="13"><tspan fill="#9bd6ff">[Arbeitnow]</tspan> Web Scraping Specialist — Beta</text>
+  <text x="290" y="390" fill="#8fa3b8" font-size="12.5">¿Quieres que prepare una propuesta para alguna?</text>
+
+  <!-- meta costo -->
+  <text x="276" y="426" fill="#5f6e82" font-size="11.5" font-family="'JetBrains Mono',monospace">sonnet · 1,204 tok · ~$0.004</text>
+
+  <!-- barra de entrada -->
+  <rect x="270" y="500" width="50" height="50" rx="12" fill="#121a28" stroke="#22384c"/>
+  <text x="295" y="532" text-anchor="middle" font-size="19">🎤</text>
+  <rect x="330" y="500" width="462" height="50" rx="12" fill="#121a28" stroke="#22384c"/>
+  <text x="350" y="530" fill="#5f6e82" font-size="14">Escribe un mensaje o pulsa el micrófono…</text>
+  <rect x="802" y="500" width="90" height="50" rx="12" fill="#38bdf8"/>
+  <text x="847" y="531" text-anchor="middle" fill="#04121d" font-size="14" font-weight="600">Enviar</text>
+</svg>

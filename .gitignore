@@ -6,6 +6,11 @@ conversaciones.json
 .env
 *.key
 
+# Config local del editor/preview
+.claude/
+_check_tmp.js
+_confirm_test.py
+
 # Basura de Python
 __pycache__/
 *.pyc

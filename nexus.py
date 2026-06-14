@@ -38,17 +38,52 @@ except ImportError:
 #  CONFIGURACION  (cambia estas variables a tu gusto)
 # ============================================================
 
+def _env(nombre: str, defecto: str) -> str:
+    """Lee una variable de entorno; si no existe o esta vacia, usa el defecto."""
+    valor = os.environ.get(nombre)
+    return valor if valor not in (None, "") else defecto
+
+
 # Modelo a usar. El mas capaz es claude-opus-4-8.
-# Para gastar MENOS dinero puedes cambiarlo por:
+# Para gastar MENOS dinero puedes cambiarlo (o exportar NEXUS_MODEL) por:
 #   "claude-sonnet-4-6"  -> mas barato y casi tan bueno   ($3 / $15 por millon de tokens)
 #   "claude-haiku-4-5"   -> el mas barato y rapido         ($1 / $5  por millon de tokens)
 # (claude-opus-4-8 cuesta $5 / $25 por millon de tokens)
-MODEL = "claude-opus-4-8"
+# TODO es configurable por variables de entorno NEXUS_* (sin tocar el codigo).
+MODEL = _env("NEXUS_MODEL", "claude-opus-4-8")
 
-MAX_TOKENS = 8000           # longitud maxima por respuesta
-TU_NOMBRE = "Senor"         # como quieres que Nexus te llame
-PEDIR_CONFIRMACION = True    # pedir permiso antes de ejecutar comandos / escribir archivos
-MAX_MENSAJES_CONTEXTO = 40   # tope de mensajes enviados a la API (evita exceder tokens en sesiones largas)
+MAX_TOKENS = int(_env("NEXUS_MAX_TOKENS", "8000"))             # longitud maxima por respuesta
+TU_NOMBRE = _env("NEXUS_NOMBRE", "Senor")                      # como quieres que Nexus te llame
+PEDIR_CONFIRMACION = _env("NEXUS_CONFIRMAR", "1").lower() not in ("0", "false", "no")  # permiso antes de comandos/escritura
+MAX_MENSAJES_CONTEXTO = int(_env("NEXUS_MAX_MENSAJES", "40"))  # tope de mensajes enviados a la API
+MAX_NOTAS = int(_env("NEXUS_MAX_NOTAS", "200"))               # tope de notas en memoria (evita crecimiento infinito)
+
+# Precios por MILLON de tokens (USD): (entrada, salida). Para estimar el costo por turno.
+# Las claves se comparan por prefijo, asi que cubren ids con fecha (claude-haiku-4-5-2025...).
+PRECIOS = {
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-opus-4": (5.0, 25.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-sonnet-4": (3.0, 15.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-haiku-4": (1.0, 5.0),
+}
+
+
+def costo_estimado(model: str, tokens_in: int, tokens_out: int) -> float:
+    """Costo estimado en USD de un intercambio, segun el modelo y los tokens usados."""
+    precio_in, precio_out = 5.0, 25.0  # fallback: opus
+    for clave, (pin, pout) in PRECIOS.items():
+        if model.startswith(clave):
+            precio_in, precio_out = pin, pout
+            break
+    return (tokens_in / 1_000_000) * precio_in + (tokens_out / 1_000_000) * precio_out
+
+
+def thinking_para(model: str):
+    """Config de 'thinking' segun el modelo: adaptive si lo soporta (Opus/Sonnet),
+    o None (desactivado) para los que no lo soportan (Haiku)."""
+    return None if model.startswith("claude-haiku") else {"type": "adaptive"}
 
 # Archivo donde Nexus guarda lo que debe recordar (junto a este script).
 CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -93,11 +128,22 @@ def cargar_memoria() -> list:
         return []
 
 
-def guardar_nota(nota: str) -> None:
+def guardar_nota(nota: str) -> bool:
+    """Guarda una nota en la memoria. Deduplica (ignorando mayusculas) y aplica un
+    tope FIFO (MAX_NOTAS) para que memoria.json no crezca sin limite ni infle el
+    system prompt. Devuelve True si la guardo, False si estaba vacia o ya existia."""
+    nota = (nota or "").strip()
+    if not nota:
+        return False
     notas = cargar_memoria()
+    if any(n.strip().lower() == nota.lower() for n in notas):
+        return False  # ya la recordaba
     notas.append(nota)
+    if len(notas) > MAX_NOTAS:
+        notas = notas[-MAX_NOTAS:]
     with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
         json.dump({"notas": notas}, f, ensure_ascii=False, indent=2)
+    return True
 
 
 def construir_system_prompt() -> str:
@@ -207,7 +253,9 @@ TOOLS = [
         },
     },
     # Busqueda web: se ejecuta en los servidores de Anthropic (no en tu PC).
-    {"type": "web_search_20260209", "name": "web_search"},
+    # allowed_callers=["direct"] lo hace compatible con modelos sin "programmatic
+    # tool calling" (p. ej. Haiku), ademas de seguir funcionando en Opus/Sonnet.
+    {"type": "web_search_20260209", "name": "web_search", "allowed_callers": ["direct"]},
 ]
 
 
@@ -229,18 +277,30 @@ def tool_recordar(args: dict) -> str:
     nota = (args.get("nota") or "").strip()
     if not nota:
         return "No se indico que recordar."
-    guardar_nota(nota)
-    return f"Anotado en memoria: {nota}"
+    if guardar_nota(nota):
+        return f"Anotado en memoria: {nota}"
+    return f"Ya lo tenia recordado: {nota}"
 
 
 def tool_rastrear_ofertas(args: dict) -> str:
-    """Descarga ofertas reales de Remotive y RemoteOK y filtra por palabras clave."""
+    """Descarga ofertas reales de varias fuentes (Remotive, RemoteOK, Arbeitnow) y
+    las filtra por palabras clave, DEDUPLICANDO por URL para no repetir."""
     import urllib.request
     import urllib.parse
     consulta = (args.get("palabras_clave") or "python").strip()
     palabras = [p.lower() for p in consulta.split() if p]
     headers = {"User-Agent": "Mozilla/5.0 (NEXUS-job-tracker)"}
-    ofertas = []
+    ofertas = []          # lineas ya formateadas (incluye avisos de fuentes caidas)
+    vistos = set()        # claves ya incluidas, para deduplicar
+
+    def _agregar(fuente, titulo, empresa, url, extra=""):
+        clave = (url or f"{titulo}|{empresa}").strip().lower()
+        if not titulo or clave in vistos:
+            return False
+        vistos.add(clave)
+        cola = f" ({extra})" if extra else ""
+        ofertas.append(f"[{fuente}] {titulo} - {empresa}{cola}\n   {url}")
+        return True
 
     # --- Fuente 1: Remotive (busqueda en el servidor) ---
     try:
@@ -250,16 +310,14 @@ def tool_rastrear_ofertas(args: dict) -> str:
         with urllib.request.urlopen(req, timeout=25) as r:
             data = json.loads(r.read().decode("utf-8", "replace"))
         n = 0
-        for j in data.get("jobs", []):
+        for j in (data.get("jobs", []) if isinstance(data, dict) else []):
             blob = (str(j.get("title", "")) + " " + str(j.get("category", "")) + " "
                     + " ".join(j.get("tags", []) or [])).lower()
             if not any(p in blob for p in palabras):
                 continue
-            ofertas.append(
-                f"[Remotive] {j.get('title')} - {j.get('company_name')} "
-                f"({j.get('candidate_required_location') or 'remoto'})\n   {j.get('url')}"
-            )
-            n += 1
+            if _agregar("Remotive", j.get("title"), j.get("company_name"),
+                        j.get("url"), j.get("candidate_required_location") or "remoto"):
+                n += 1
             if n >= 12:
                 break
     except Exception as e:
@@ -271,17 +329,33 @@ def tool_rastrear_ofertas(args: dict) -> str:
         with urllib.request.urlopen(req, timeout=25) as r:
             data = json.loads(r.read().decode("utf-8", "replace"))
         n = 0
-        for it in data:
+        for it in (data if isinstance(data, list) else []):
             if not isinstance(it, dict) or not it.get("position"):
                 continue
             blob = (str(it.get("position", "")) + " " + " ".join(it.get("tags", []) or [])).lower()
             if any(p in blob for p in palabras):
-                ofertas.append(f"[RemoteOK] {it.get('position')} - {it.get('company')}\n   {it.get('url')}")
-                n += 1
+                if _agregar("RemoteOK", it.get("position"), it.get("company"), it.get("url")):
+                    n += 1
                 if n >= 12:
                     break
     except Exception as e:
         ofertas.append(f"(RemoteOK no disponible ahora: {e})")
+
+    # --- Fuente 3: Arbeitnow (job board publico) ---
+    try:
+        req = urllib.request.Request("https://www.arbeitnow.com/api/job-board-api", headers=headers)
+        with urllib.request.urlopen(req, timeout=25) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+        n = 0
+        for j in (data.get("data", []) if isinstance(data, dict) else []):
+            blob = (str(j.get("title", "")) + " " + " ".join(j.get("tags", []) or [])).lower()
+            if any(p in blob for p in palabras):
+                if _agregar("Arbeitnow", j.get("title"), j.get("company_name"), j.get("url")):
+                    n += 1
+                if n >= 12:
+                    break
+    except Exception as e:
+        ofertas.append(f"(Arbeitnow no disponible ahora: {e})")
 
     utiles = [o for o in ofertas if not o.startswith("(")]
     if not utiles:
@@ -291,11 +365,11 @@ def tool_rastrear_ofertas(args: dict) -> str:
     return "\n".join(ofertas[:24])
 
 
-def tool_run_command(args: dict) -> str:
+def ejecutar_powershell(cmd: str) -> str:
+    """Ejecuta un comando de PowerShell y devuelve su salida, SIN pedir confirmacion.
+    La confirmacion se maneja afuera (en la terminal con _confirmar; en la web con el
+    modal de aprobacion). Asi ambos frentes reutilizan esta misma logica."""
     import subprocess
-    cmd = args.get("command", "")
-    if not _confirmar(f"Nexus quiere EJECUTAR:\n    {cmd}"):
-        return "El usuario denego la ejecucion de este comando."
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-Command", cmd],
@@ -309,6 +383,13 @@ def tool_run_command(args: dict) -> str:
         return f"Error al ejecutar el comando: {e}"
 
 
+def tool_run_command(args: dict) -> str:
+    cmd = args.get("command", "")
+    if not _confirmar(f"Nexus quiere EJECUTAR:\n    {cmd}"):
+        return "El usuario denego la ejecucion de este comando."
+    return ejecutar_powershell(cmd)
+
+
 def tool_read_file(args: dict) -> str:
     path = args.get("path", "")
     try:
@@ -318,17 +399,22 @@ def tool_read_file(args: dict) -> str:
         return f"Error al leer '{path}': {e}"
 
 
-def tool_write_file(args: dict) -> str:
-    path = args.get("path", "")
-    content = args.get("content", "")
-    if not _confirmar(f"Nexus quiere ESCRIBIR el archivo:\n    {path}"):
-        return "El usuario denego escribir el archivo."
+def escribir_archivo(path: str, content: str) -> str:
+    """Escribe (o sobrescribe) un archivo de texto, SIN pedir confirmacion."""
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"Archivo guardado: {path} ({len(content)} caracteres)."
     except Exception as e:
         return f"Error al escribir '{path}': {e}"
+
+
+def tool_write_file(args: dict) -> str:
+    path = args.get("path", "")
+    content = args.get("content", "")
+    if not _confirmar(f"Nexus quiere ESCRIBIR el archivo:\n    {path}"):
+        return "El usuario denego escribir el archivo."
+    return escribir_archivo(path, content)
 
 
 def tool_list_directory(args: dict) -> str:
@@ -397,19 +483,22 @@ def main():
         messages.append({"role": "user", "content": entrada})
         messages = recortar_contexto(messages)
 
+        turno_in = turno_out = 0
         for _ in range(10):  # tope de seguridad de iteraciones por turno
+            kwargs = dict(model=MODEL, max_tokens=MAX_TOKENS, system=system_prompt,
+                          tools=TOOLS, messages=messages)
+            _th = thinking_para(MODEL)
+            if _th:
+                kwargs["thinking"] = _th
             try:
-                response = client.messages.create(
-                    model=MODEL,
-                    max_tokens=MAX_TOKENS,
-                    system=system_prompt,
-                    thinking={"type": "adaptive"},
-                    tools=TOOLS,
-                    messages=messages,
-                )
+                response = client.messages.create(**kwargs)
             except anthropic.APIError as e:
                 print(f"\n[Error de la API: {e}]")
                 break
+
+            if getattr(response, "usage", None):
+                turno_in += response.usage.input_tokens
+                turno_out += response.usage.output_tokens
 
             for block in response.content:
                 if block.type == "text":
@@ -435,6 +524,10 @@ def main():
                 messages.append({"role": "user", "content": resultados})
                 continue
             break
+
+        if turno_in or turno_out:
+            costo = costo_estimado(MODEL, turno_in, turno_out)
+            print(f"\n   [tokens: {turno_in:,} in / {turno_out:,} out  ~${costo:.4f}]")
 
 
 if __name__ == "__main__":
