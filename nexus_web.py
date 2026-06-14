@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 NEXUS WEB - Interfaz web (HUD) para tu asistente Nexus, con HISTORIAL de
-conversaciones persistente (estilo ChatGPT: panel lateral con todas tus charlas).
+conversaciones persistente (estilo ChatGPT: panel lateral con todas tus charlas),
+voz, contador de costo, ajustes y confirmacion en el navegador.
 
-Reutiliza la logica y herramientas de nexus.py. Respuestas en streaming.
+Reutiliza la logica y herramientas de nexus.py. Respuestas en streaming (SSE).
 
 Arranque:
   pip install -r requirements.txt
@@ -13,9 +14,10 @@ Arranque:
 
 Las conversaciones se guardan en  conversaciones.json  (junto a este archivo).
 
-SEGURIDAD: en la web, por defecto NO se ejecutan comandos del sistema ni se
-escriben archivos (run_command / write_file deshabilitados). Para eso usa la
-version de terminal (nexus.py).
+SEGURIDAD: por defecto, en la web NO se ejecutan comandos del sistema ni se
+escriben archivos (run_command / write_file deshabilitados). Puedes habilitarlos
+con la variable de entorno NEXUS_WEB_ACCIONES=1: en ese caso CADA accion peligrosa
+requiere tu aprobacion explicita en un modal de confirmacion del navegador.
 """
 
 import os
@@ -23,6 +25,7 @@ import sys
 import json
 import uuid
 import datetime
+import threading
 
 try:
     import anthropic  # noqa: F401
@@ -37,18 +40,38 @@ import anthropic
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
-CONV_PATH = os.path.join(CARPETA, "conversaciones.json")
+CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
 
+# Herramientas de solo-lectura, siempre disponibles en la web.
 SEGURAS = {"recordar", "rastrear_ofertas", "read_file", "list_directory"}
-TOOLS_WEB = [t for t in nexus.TOOLS if t.get("name") not in ("run_command", "write_file")]
+# Herramientas que tocan el sistema: solo si NEXUS_WEB_ACCIONES=1, y con confirmacion.
+PELIGROSAS = {"run_command", "write_file"}
 
-SYSTEM_WEB_EXTRA = (
-    "\n\nEstas en la interfaz WEB de Nexus: por seguridad NO tienes run_command "
-    "ni write_file. Si el usuario pide ejecutar comandos o escribir archivos, "
-    "indicale amablemente que use la version de terminal."
-)
+WEB_ACCIONES = nexus._env("NEXUS_WEB_ACCIONES", "0").lower() in ("1", "true", "yes", "on")
+
+if WEB_ACCIONES:
+    TOOLS_WEB = list(nexus.TOOLS)  # todas; las peligrosas pasan por el modal
+    SYSTEM_WEB_EXTRA = (
+        "\n\nEstas en la interfaz WEB de Nexus. Puedes usar run_command y write_file, "
+        "pero CADA uso requiere que el usuario lo apruebe en un modal de confirmacion "
+        "del navegador. Usalas solo cuando de verdad ayuden."
+    )
+else:
+    TOOLS_WEB = [t for t in nexus.TOOLS if t.get("name") not in PELIGROSAS]
+    SYSTEM_WEB_EXTRA = (
+        "\n\nEstas en la interfaz WEB de Nexus: por seguridad NO tienes run_command ni "
+        "write_file. Si el usuario pide ejecutar comandos o escribir archivos, indicale "
+        "amablemente que use la version de terminal."
+    )
+
+# Modelos que la interfaz puede elegir (el resto cae al de por defecto).
+MODELOS_OK = {"claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"}
 
 app = Flask(__name__, static_folder=None)
+
+# Registro de confirmaciones pendientes (handshake SSE <-> /api/confirm).
+_pendientes = {}
+_lock = threading.Lock()
 
 
 # ---------------- Persistencia de conversaciones ----------------
@@ -77,9 +100,10 @@ def ahora() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-# ---------------- Herramientas (solo seguras en web) ----------------
+# ---------------- Ejecucion de herramientas ----------------
 
 def ejecutar_web(name: str, args: dict) -> str:
+    """Ejecuta una herramienta de SOLO LECTURA (segura) reutilizando nexus.py."""
     if name in SEGURAS:
         try:
             return nexus.EJECUTORES[name](args)
@@ -87,6 +111,29 @@ def ejecutar_web(name: str, args: dict) -> str:
             return f"Error en {name}: {e}"
     return (f"La herramienta '{name}' esta deshabilitada en la web por seguridad. "
             "Indica al usuario que use la terminal.")
+
+
+def ejecutar_peligrosa(name: str, args: dict) -> str:
+    """Ejecuta una accion de sistema YA APROBADA por el usuario (modal)."""
+    if name == "run_command":
+        return nexus.ejecutar_powershell(args.get("command", ""))
+    if name == "write_file":
+        return nexus.escribir_archivo(args.get("path", ""), args.get("content", ""))
+    return f"Herramienta desconocida: {name}"
+
+
+def resumen_accion(name: str, args: dict) -> str:
+    if name == "run_command":
+        return args.get("command", "")
+    if name == "write_file":
+        n = len(args.get("content", "") or "")
+        return f"Escribir archivo: {args.get('path', '')}   ({n} caracteres)"
+    return name
+
+
+def modelo_pedido() -> str:
+    m = (request.args.get("model") or "").strip()
+    return m if m in MODELOS_OK else nexus.MODEL
 
 
 def sse(event: str, data) -> str:
@@ -98,6 +145,11 @@ def sse(event: str, data) -> str:
 @app.route("/")
 def index():
     return send_from_directory(os.path.join(CARPETA, "web"), "index.html")
+
+
+@app.route("/api/config")
+def config():
+    return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK)})
 
 
 @app.route("/api/conversaciones")
@@ -124,10 +176,39 @@ def borrar_conv(cid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/conversacion/<cid>/renombrar", methods=["POST"])
+def renombrar_conv(cid):
+    body = request.get_json(silent=True) or {}
+    titulo = (body.get("titulo") or "").strip()[:60]
+    if not titulo:
+        return jsonify({"ok": False, "error": "titulo vacio"}), 400
+    data = cargar_convs()
+    c = buscar_conv(data, cid)
+    if not c:
+        return jsonify({"ok": False, "error": "no existe"}), 404
+    c["titulo"] = titulo
+    guardar_convs(data)
+    return jsonify({"ok": True, "titulo": titulo})
+
+
 @app.route("/api/nueva", methods=["POST"])
 def nueva_conv():
     # Devuelve un id; la conversacion se persiste al primer mensaje.
     return jsonify({"id": uuid.uuid4().hex[:12]})
+
+
+@app.route("/api/confirm", methods=["POST"])
+def confirmar():
+    """El navegador aprueba/deniega una accion peligrosa pendiente."""
+    body = request.get_json(silent=True) or {}
+    rid = (body.get("rid") or "").strip()
+    ok = bool(body.get("ok"))
+    with _lock:
+        estado = _pendientes.get(rid)
+        if estado:
+            estado["ok"] = ok
+            estado["event"].set()
+    return jsonify({"ok": bool(estado)})
 
 
 @app.route("/api/stream")
@@ -138,7 +219,12 @@ def stream():
         return Response(sse("done", {}), mimetype="text/event-stream")
 
     client = anthropic.Anthropic()
+    model = modelo_pedido()
+    regen = (request.args.get("regen") or "") == "1"
+    nombre = (request.args.get("nombre") or "").strip()[:40]
     system_prompt = nexus.construir_system_prompt() + SYSTEM_WEB_EXTRA
+    if nombre:
+        system_prompt += f"\n\nEl usuario prefiere que lo llames: {nombre}."
 
     def gen():
         data = cargar_convs()
@@ -148,6 +234,9 @@ def stream():
             conv = {"id": cid, "titulo": msg[:42] or "Conversacion",
                     "creado": ahora(), "turnos": []}
             data["convs"].insert(0, conv)
+        elif regen and len(conv["turnos"]) >= 2:
+            # Regenerar: descartamos el ultimo par (usuario + asistente) para rehacerlo.
+            conv["turnos"] = conv["turnos"][:-2]
 
         # Reconstruimos el contexto (texto simple) y agregamos el nuevo mensaje.
         api_messages = [{"role": t["role"], "content": t["text"]} for t in conv["turnos"]]
@@ -155,20 +244,23 @@ def stream():
         api_messages = nexus.recortar_contexto(api_messages)
 
         texto_final = ""
+        tin = tout = 0
         try:
             for _ in range(10):
-                with client.messages.stream(
-                    model=nexus.MODEL,
-                    max_tokens=nexus.MAX_TOKENS,
-                    system=system_prompt,
-                    thinking={"type": "adaptive"},
-                    tools=TOOLS_WEB,
-                    messages=api_messages,
-                ) as s:
+                _kw = dict(model=model, max_tokens=nexus.MAX_TOKENS, system=system_prompt,
+                           tools=TOOLS_WEB, messages=api_messages)
+                _th = nexus.thinking_para(model)
+                if _th:
+                    _kw["thinking"] = _th
+                with client.messages.stream(**_kw) as s:
                     for texto in s.text_stream:
                         texto_final += texto
                         yield sse("delta", {"text": texto})
                     final = s.get_final_message()
+
+                if getattr(final, "usage", None):
+                    tin += final.usage.input_tokens
+                    tout += final.usage.output_tokens
 
                 api_messages.append({"role": "assistant", "content": final.content})
 
@@ -179,14 +271,35 @@ def stream():
                 if final.stop_reason == "tool_use":
                     resultados = []
                     for b in final.content:
-                        if b.type == "tool_use":
+                        if b.type != "tool_use":
+                            continue
+                        if b.name in PELIGROSAS and WEB_ACCIONES:
+                            # --- Handshake de confirmacion con el navegador ---
+                            rid = uuid.uuid4().hex[:10]
+                            ev = threading.Event()
+                            with _lock:
+                                _pendientes[rid] = {"event": ev, "ok": False}
+                            yield sse("confirm", {
+                                "rid": rid, "name": b.name,
+                                "resumen": resumen_accion(b.name, b.input),
+                            })
+                            aprobado = ev.wait(timeout=150)
+                            with _lock:
+                                estado = _pendientes.pop(rid, None)
+                            if aprobado and estado and estado["ok"]:
+                                yield sse("tool", {"name": b.name})
+                                salida = ejecutar_peligrosa(b.name, b.input)
+                            else:
+                                salida = ("El usuario no aprobo la accion "
+                                          "(denegada o sin respuesta a tiempo).")
+                        else:
                             yield sse("tool", {"name": b.name})
                             salida = ejecutar_web(b.name, b.input)
-                            resultados.append({
-                                "type": "tool_result",
-                                "tool_use_id": b.id,
-                                "content": salida,
-                            })
+                        resultados.append({
+                            "type": "tool_result",
+                            "tool_use_id": b.id,
+                            "content": salida,
+                        })
                     api_messages.append({"role": "user", "content": resultados})
                     continue
                 break
@@ -198,6 +311,11 @@ def stream():
         conv["turnos"].append({"role": "assistant", "text": texto_final})
         guardar_convs(data)
 
+        if tin or tout:
+            yield sse("usage", {
+                "in": tin, "out": tout, "modelo": model,
+                "costo": round(nexus.costo_estimado(model, tin, tout), 5),
+            })
         yield sse("done", {"cid": cid, "nueva": nueva, "titulo": conv["titulo"]})
 
     return Response(
@@ -211,11 +329,13 @@ def main():
     if not os.environ.get("ANTHROPIC_API_KEY"):
         sys.exit('Falta ANTHROPIC_API_KEY. Configurala con:  setx ANTHROPIC_API_KEY "sk-ant-..."')
     import webbrowser
-    import threading
-    url = "http://127.0.0.1:5000"
-    threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    print(f"NEXUS web encendido en {url}   (Ctrl+C para detener)")
-    app.run(host="127.0.0.1", port=5000, threaded=True)
+    port = int(nexus._env("NEXUS_PORT", "5000"))
+    url = f"http://127.0.0.1:{port}"
+    if nexus._env("NEXUS_OPEN", "1").lower() not in ("0", "false", "no"):
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    extra = "  [acciones de sistema ON]" if WEB_ACCIONES else ""
+    print(f"NEXUS web encendido en {url}{extra}   (Ctrl+C para detener)")
+    app.run(host="127.0.0.1", port=port, threaded=True)
 
 
 if __name__ == "__main__":
