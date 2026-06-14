@@ -155,3 +155,47 @@ def test_conversaciones_roundtrip(tmp_path, monkeypatch):
     assert nexus_web.cargar_convs() == data
     assert nexus_web.buscar_conv(data, "abc")["titulo"] == "Demo"
     assert nexus_web.buscar_conv(data, "no_existe") is None
+
+
+# --------------------------- Endpoints web (sin red ni API) ---------------------------
+
+def test_api_config():
+    c = nexus_web.app.test_client()
+    r = c.get("/api/config")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "acciones" in data and "modelo" in data and "modelos" in data
+
+
+def test_api_nueva_devuelve_id():
+    c = nexus_web.app.test_client()
+    r = c.post("/api/nueva")
+    assert r.status_code == 200
+    assert len(r.get_json()["id"]) == 12
+
+
+def test_renombrar_conversacion(tmp_path, monkeypatch):
+    monkeypatch.setattr(nexus_web, "CONV_PATH", str(tmp_path / "conversaciones.json"))
+    nexus_web.guardar_convs({"convs": [{"id": "abc", "titulo": "Viejo", "creado": "", "turnos": []}]})
+    c = nexus_web.app.test_client()
+    r = c.post("/api/conversacion/abc/renombrar", json={"titulo": "Nuevo nombre"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert nexus_web.buscar_conv(nexus_web.cargar_convs(), "abc")["titulo"] == "Nuevo nombre"
+
+
+def test_renombrar_inexistente(tmp_path, monkeypatch):
+    monkeypatch.setattr(nexus_web, "CONV_PATH", str(tmp_path / "conversaciones.json"))
+    c = nexus_web.app.test_client()
+    r = c.post("/api/conversacion/nope/renombrar", json={"titulo": "X"})
+    assert r.status_code == 404
+
+
+def test_confirm_rid_desconocido():
+    c = nexus_web.app.test_client()
+    r = c.post("/api/confirm", json={"rid": "noexiste", "ok": True})
+    assert r.status_code == 200 and r.get_json()["ok"] is False
+
+
+def test_resumen_accion():
+    assert "echo hola" in nexus_web.resumen_accion("run_command", {"command": "echo hola"})
+    assert "archivo" in nexus_web.resumen_accion("write_file", {"path": "x.txt", "content": "ab"}).lower()
