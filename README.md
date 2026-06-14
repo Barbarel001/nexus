@@ -37,13 +37,13 @@ It's a compact but complete example of an **agentic application**, demonstrating
 |---|---|
 | 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`. |
-| 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive and RemoteOK by keyword. |
+| 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
 | ✅ **In-browser confirmation** | Optional web system actions (run commands / write files) gated behind an explicit approval modal. |
-| 🖥️ **Terminal client** | Full agent with the complete tool set and an iteration safety cap per turn. |
+| 🖥️ **Terminal client** | Full agent with the complete tool set, **streaming** responses and an iteration safety cap per turn. |
 | 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools unless explicitly opted in. |
 
 ## Architecture
@@ -144,8 +144,10 @@ never published.
 - [x] Token & cost meter per turn
 - [x] Model picker, settings panel, conversation rename / search / export
 - [x] UI mockup in the README
-- [ ] More job sources (added Arbeitnow; next: Workana, Upwork, r/forhire)
-- [ ] Persist full tool-use history in the web UI across reloads
+- [x] More job sources — Remotive, RemoteOK, Arbeitnow, Jobicy (next: Workana, Upwork, r/forhire)
+- [x] Streaming responses in the terminal client
+- [x] Tool-use chips shown when reopening a conversation
+- [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 
 ---
