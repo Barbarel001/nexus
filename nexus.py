@@ -52,6 +52,10 @@ def _env(nombre: str, defecto: str) -> str:
 # TODO es configurable por variables de entorno NEXUS_* (sin tocar el codigo).
 MODEL = _env("NEXUS_MODEL", "claude-opus-4-8")
 
+# Backend del modelo: "claude" (API de Anthropic, por defecto) u "ollama" (modelo
+# LOCAL en tu PC, coste $0). Con ollama no se consumen tokens de la API.
+BACKEND = _env("NEXUS_BACKEND", "claude").lower()
+
 MAX_TOKENS = int(_env("NEXUS_MAX_TOKENS", "8000"))             # longitud maxima por respuesta
 TU_NOMBRE = _env("NEXUS_NOMBRE", "Senor")                      # como quieres que Nexus te llame
 PEDIR_CONFIRMACION = _env("NEXUS_CONFIRMAR", "1").lower() not in ("0", "false", "no")  # permiso antes de comandos/escritura

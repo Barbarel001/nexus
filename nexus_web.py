@@ -38,6 +38,7 @@ except ImportError:
 
 import anthropic
 import nexus  # reutilizamos toda la logica del Nexus de terminal
+import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -149,7 +150,9 @@ def index():
 
 @app.route("/api/config")
 def config():
-    return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK)})
+    return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
+                    "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
+                    "ollama_disponible": nexus_ollama.disponible()})
 
 
 @app.route("/api/conversaciones")
@@ -218,8 +221,8 @@ def stream():
     if not msg or not cid:
         return Response(sse("done", {}), mimetype="text/event-stream")
 
-    client = anthropic.Anthropic()
     model = modelo_pedido()
+    usar_ollama = nexus.BACKEND == "ollama" or (request.args.get("model") or "") == "ollama"
     regen = (request.args.get("regen") or "") == "1"
     nombre = (request.args.get("nombre") or "").strip()[:40]
     system_prompt = nexus.construir_system_prompt() + SYSTEM_WEB_EXTRA
@@ -246,6 +249,39 @@ def stream():
         texto_final = ""
         tin = tout = 0
         tools_usados = []
+
+        # ---- Backend LOCAL (Ollama): coste 0, sin tokens de la API ----
+        if usar_ollama:
+            oll_msgs = [{"role": t["role"], "content": t["text"]} for t in conv["turnos"]]
+            oll_msgs.append({"role": "user", "content": msg})
+            oll_msgs = nexus.recortar_contexto(oll_msgs)
+            try:
+                for evt, pl in nexus_ollama.chat_eventos(
+                        oll_msgs, system_prompt, nexus_ollama.tools_ollama(False), ejecutar_web):
+                    if evt == "delta":
+                        texto_final += pl
+                        yield sse("delta", {"text": pl})
+                    elif evt == "tool":
+                        tools_usados.append(pl)
+                        yield sse("tool", {"name": pl})
+                    elif evt == "fin":
+                        tin, tout = pl["in"], pl["out"]
+                        if pl["text"]:
+                            texto_final = pl["text"]
+            except Exception as e:
+                yield sse("error", {"msg": f"Ollama: {e}"})
+            conv["turnos"].append({"role": "user", "text": msg})
+            conv["turnos"].append({"role": "assistant", "text": texto_final,
+                                   "tools": list(dict.fromkeys(tools_usados))})
+            guardar_convs(data)
+            if tin or tout:
+                yield sse("usage", {"in": tin, "out": tout,
+                                    "modelo": nexus_ollama.OLLAMA_MODEL, "costo": 0})
+            yield sse("done", {"cid": cid, "nueva": nueva, "titulo": conv["titulo"]})
+            return
+
+        # ---- Backend Claude (API de Anthropic) ----
+        client = anthropic.Anthropic()
         try:
             for _ in range(10):
                 _kw = dict(model=model, max_tokens=nexus.MAX_TOKENS, system=system_prompt,
@@ -329,7 +365,7 @@ def stream():
 
 
 def main():
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if nexus.BACKEND != "ollama" and not os.environ.get("ANTHROPIC_API_KEY"):
         sys.exit('Falta ANTHROPIC_API_KEY. Configurala con:  setx ANTHROPIC_API_KEY "sk-ant-..."')
     import webbrowser
     port = int(nexus._env("NEXUS_PORT", "5000"))

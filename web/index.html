@@ -410,8 +410,10 @@ function sendMessage(text, porVoz, opts){
 
 function pintaCosto(node, u){
   const tot = (u.in||0) + (u.out||0);
-  const corto = (u.modelo||'').split('-')[1] || '';
-  const cst = (u.costo < 0.001) ? '<$0.001' : ('~$' + Number(u.costo).toFixed(u.costo < 0.01 ? 5 : 4));
+  const m = (u.modelo||'');
+  const corto = m.startsWith('claude-') ? m.split('-')[1] : m;   // 'opus' o 'qwen2.5:7b'
+  const cst = (u.costo === 0) ? '$0 (local)'
+            : (u.costo < 0.001 ? '<$0.001' : '~$' + Number(u.costo).toFixed(u.costo < 0.01 ? 5 : 4));
   const d = document.createElement('div'); d.className = 'meta';
   d.textContent = (corto ? corto + ' · ' : '') + tot.toLocaleString() + ' tok · ' + cst;
   node.appendChild(d);
@@ -479,6 +481,10 @@ document.getElementById('settings').addEventListener('click', () => {
   (cfg.modelos.length ? cfg.modelos : [cfg.modelo]).forEach(mid => {
     const o = document.createElement('option'); o.value = mid; o.textContent = ETIQ[mid] || mid; sel.appendChild(o);
   });
+  if(cfg.ollama_disponible){
+    const o = document.createElement('option'); o.value = 'ollama';
+    o.textContent = '🖥️ Local: ' + (cfg.ollama_model || 'modelo') + ' — gratis $0'; sel.appendChild(o);
+  }
   sel.value = SET.model;
   document.getElementById('setNombre').value = SET.nombre;
   document.getElementById('setTts').checked = SET.tts;
