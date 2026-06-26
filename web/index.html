@@ -263,6 +263,7 @@
         <div class="controls">
           <span class="badge"><span class="led"></span> En línea</span>
           <button class="btn-ic" id="dashBtn" title="Panel (trading y tareas)">📊</button>
+          <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -337,6 +338,20 @@
         <button class="m-btn ghost" id="confirmNo">Denegar</button>
         <button class="m-btn danger" id="confirmYes">Aprobar y ejecutar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: memoria de Nexus -->
+  <div class="modal-bg" id="memBg">
+    <div class="modal">
+      <div class="modal-h">🧠 Memoria de Nexus</div>
+      <div class="modal-sub">Lo que Nexus recuerda de ti entre sesiones.</div>
+      <div id="memList" style="max-height:300px;overflow:auto;margin-bottom:12px"></div>
+      <div class="add-row">
+        <input id="memInp" placeholder="Recordar algo nuevo…" autocomplete="off" />
+        <button id="memAdd" title="Recordar">＋</button>
+      </div>
+      <div class="modal-actions"><button class="m-btn ghost" id="memClose">Cerrar</button></div>
     </div>
   </div>
 
@@ -886,6 +901,41 @@ function abrirChart(sym){
   chartBg.classList.add('show');
 }
 document.getElementById('chartClose').addEventListener('click', () => chartBg.classList.remove('show'));
+
+/* Gestor de memoria */
+const memBg = document.getElementById('memBg');
+document.getElementById('memBtn').addEventListener('click', () => { memBg.classList.add('show'); cargarMemoria(); });
+document.getElementById('memClose').addEventListener('click', () => memBg.classList.remove('show'));
+async function cargarMemoria(){
+  const cont = document.getElementById('memList'); cont.innerHTML = 'Cargando…';
+  try{
+    const r = await fetch('/api/memoria'); const d = await r.json();
+    const notas = d.notas || [];
+    cont.innerHTML = '';
+    if(!notas.length){ cont.innerHTML = '<div class="dash-empty">Nexus aún no recuerda nada.</div>'; return; }
+    for(const n of notas){
+      const row = document.createElement('div'); row.className = 'trow';
+      row.innerHTML = '<div class="tx"><div class="tt">' + esc(n.texto) + '</div>' +
+                      '<div class="due">' + esc(n.categoria || 'general') + '</div></div>' +
+                      '<button class="rm" title="Olvidar">×</button>';
+      row.querySelector('.rm').addEventListener('click', async () => {
+        await fetch('/api/memoria/olvidar', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ref: n.id})});
+        cargarMemoria();
+      });
+      cont.appendChild(row);
+    }
+  }catch(_){ cont.innerHTML = 'No se pudo cargar la memoria.'; }
+}
+async function addMemoria(){
+  const i = document.getElementById('memInp'); const v = i.value.trim();
+  if(!v) return;
+  await fetch('/api/memoria/agregar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({texto: v})});
+  i.value = ''; cargarMemoria();
+}
+document.getElementById('memAdd').addEventListener('click', addMemoria);
+document.getElementById('memInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addMemoria(); } });
 
 /* Diario de trading */
 const infoBg = document.getElementById('infoBg');

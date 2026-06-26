@@ -44,14 +44,16 @@ import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
 import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_alertas as alertas  # alertas de precio
+import nexus_docs as docs  # RAG-lite sobre documentos
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
 
 # Herramientas seguras, siempre disponibles en la web: lectura general, lectura de
 # NinjaTrader (estado/precio/posicion, no mueven dinero) y productividad (tareas).
-SEGURAS = ({"recordar", "rastrear_ofertas", "read_file", "list_directory"}
-           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS)
+SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
+            "read_file", "list_directory"}
+           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -284,6 +286,32 @@ def panel():
         "tareas": [tareas.dto(t) for t in tareas.filtrar("pendientes")],
         "resumen": tareas.resumen_pendientes(),
     })
+
+
+@app.route("/api/memoria")
+def memoria_api():
+    """Lista la memoria a largo plazo (para gestionarla desde el panel)."""
+    return jsonify({"notas": nexus.cargar_notas()})
+
+
+@app.route("/api/memoria/agregar", methods=["POST"])
+def memoria_agregar_api():
+    body = request.get_json(silent=True) or {}
+    texto = (body.get("texto") or "").strip()
+    if not texto:
+        return jsonify({"ok": False, "error": "texto vacio"}), 400
+    ok = nexus.guardar_nota(texto, (body.get("categoria") or "general"))
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/memoria/olvidar", methods=["POST"])
+def memoria_olvidar_api():
+    body = request.get_json(silent=True) or {}
+    ref = (body.get("ref") or "").strip()
+    if not ref:
+        return jsonify({"ok": False, "error": "falta ref"}), 400
+    msg = nexus.olvidar_nota(ref)
+    return jsonify({"ok": "olvidado" in msg.lower(), "msg": msg})
 
 
 @app.route("/api/diario")

@@ -6,6 +6,7 @@ alertas.json
 nexus_trades.log
 *.log
 nexus_nt_sim/
+documentos/
 
 # Variables de entorno / secretos
 .env

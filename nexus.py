@@ -20,6 +20,7 @@ Requisitos:
 import os
 import sys
 import json
+import uuid
 import datetime
 
 # Hacer que la salida soporte acentos/emoji en la terminal de Windows.
@@ -36,6 +37,7 @@ except ImportError:
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
 import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
+import nexus_docs as docs  # RAG-lite sobre documentos del usuario
 
 
 # ============================================================
@@ -115,6 +117,8 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - agregar_tarea / listar_tareas / completar_tarea / eliminar_tarea: gestionar tareas y
   recordatorios del usuario (con fecha de vencimiento y prioridad).
 - alerta_precio: crear/listar/eliminar/evaluar alertas de precio (ej. "avisame si el ES toca 5000").
+- buscar_memoria / olvidar_memoria: consultar o borrar notas de tu memoria a largo plazo.
+- buscar_documentos: responder con base en los documentos personales del usuario (.txt/.md/.pdf).
 
 Contexto del usuario:
 - Sabe programar (Python) y quiere conseguir ingresos como freelance de bots
@@ -138,37 +142,94 @@ Reglas:
 #  MEMORIA PERSISTENTE
 # ============================================================
 
-def cargar_memoria() -> list:
+def _normalizar_nota(item) -> dict:
+    """Acepta tanto el formato antiguo (texto plano) como el nuevo (objeto con
+    categoria) y devuelve siempre un objeto. Compatibilidad hacia atras."""
+    if isinstance(item, dict):
+        return {"id": item.get("id") or uuid.uuid4().hex[:6],
+                "texto": str(item.get("texto", "")).strip(),
+                "categoria": (item.get("categoria") or "general").strip().lower(),
+                "creada": item.get("creada", "")}
+    return {"id": uuid.uuid4().hex[:6], "texto": str(item).strip(),
+            "categoria": "general", "creada": ""}
+
+
+def cargar_notas() -> list:
+    """Memoria completa como lista de objetos {id, texto, categoria, creada}."""
     try:
         with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
-            return json.load(f).get("notas", [])
+            crudas = json.load(f).get("notas", [])
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+    return [n for n in (_normalizar_nota(x) for x in crudas) if n["texto"]]
 
 
-def guardar_nota(nota: str) -> bool:
-    """Guarda una nota en la memoria. Deduplica (ignorando mayusculas) y aplica un
-    tope FIFO (MAX_NOTAS) para que memoria.json no crezca sin limite ni infle el
-    system prompt. Devuelve True si la guardo, False si estaba vacia o ya existia."""
+def cargar_memoria() -> list:
+    """Lista de textos recordados (compatibilidad: lo usa el system prompt)."""
+    return [n["texto"] for n in cargar_notas()]
+
+
+def _guardar_notas(notas: list) -> None:
+    with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
+        json.dump({"notas": notas}, f, ensure_ascii=False, indent=2)
+
+
+def guardar_nota(nota: str, categoria: str = "general") -> bool:
+    """Guarda una nota (con categoria opcional). Deduplica por texto (ignorando
+    mayusculas) y aplica un tope FIFO (MAX_NOTAS). Devuelve True si la guardo."""
     nota = (nota or "").strip()
     if not nota:
         return False
-    notas = cargar_memoria()
-    if any(n.strip().lower() == nota.lower() for n in notas):
+    notas = cargar_notas()
+    if any(n["texto"].lower() == nota.lower() for n in notas):
         return False  # ya la recordaba
-    notas.append(nota)
+    notas.append({"id": uuid.uuid4().hex[:6], "texto": nota,
+                  "categoria": (categoria or "general").strip().lower(),
+                  "creada": HOY})
     if len(notas) > MAX_NOTAS:
         notas = notas[-MAX_NOTAS:]
-    with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
-        json.dump({"notas": notas}, f, ensure_ascii=False, indent=2)
+    _guardar_notas(notas)
     return True
 
 
+def buscar_notas(consulta: str) -> list:
+    """Busca notas cuyo texto o categoria contengan la consulta (sin mayus/minus)."""
+    q = (consulta or "").strip().lower()
+    if not q:
+        return cargar_notas()
+    return [n for n in cargar_notas() if q in n["texto"].lower() or q in n["categoria"]]
+
+
+def olvidar_nota(ref: str) -> str:
+    """Borra una nota por id (prefijo) o por substring de su texto."""
+    ref = (ref or "").strip().lower()
+    if not ref:
+        return "Indica que quieres olvidar (id o parte del texto)."
+    notas = cargar_notas()
+    coincide = [n for n in notas if n["id"].lower().startswith(ref)] or \
+               [n for n in notas if ref in n["texto"].lower()]
+    if not coincide:
+        return f"No encontre nada en memoria que coincida con '{ref}'."
+    if len(coincide) > 1:
+        ids = ", ".join(f"{n['id']} ({n['texto'][:30]})" for n in coincide[:5])
+        return f"Hay varias notas que coinciden. Precisa el id: {ids}"
+    objetivo = coincide[0]
+    _guardar_notas([n for n in notas if n["id"] != objetivo["id"]])
+    return f"Olvidado: {objetivo['texto']}"
+
+
 def construir_system_prompt() -> str:
-    notas = cargar_memoria()
+    notas = cargar_notas()
     if not notas:
         return BASE_PROMPT
-    lista = "\n".join(f"- {n}" for n in notas)
+    # Agrupadas por categoria para que el modelo las use con mas contexto.
+    por_cat = {}
+    for n in notas:
+        por_cat.setdefault(n["categoria"], []).append(n["texto"])
+    bloques = []
+    for cat, items in por_cat.items():
+        bloques.append(f"[{cat}]\n" + "\n".join(f"- {t}" for t in items))
+    lista = "\n".join(bloques)
     return BASE_PROMPT + f"\n\nESTO ES LO QUE RECUERDAS de antes (usalo con naturalidad):\n{lista}\n"
 
 
@@ -200,12 +261,34 @@ TOOLS = [
         "description": (
             "Guarda un dato importante en tu memoria a largo plazo para recordarlo en "
             "futuras sesiones (el nombre del usuario, sus preferencias, sus metas, datos "
-            "de sus proyectos, o cualquier cosa que pida recordar)."
+            "de sus proyectos, o cualquier cosa que pida recordar). Puedes indicar una "
+            "categoria (ej. 'personal', 'trabajo', 'trading', 'salud')."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"nota": {"type": "string", "description": "El dato a recordar, en una frase clara."}},
+            "properties": {
+                "nota": {"type": "string", "description": "El dato a recordar, en una frase clara."},
+                "categoria": {"type": "string", "description": "Categoria opcional (ej. personal, trabajo, trading)."},
+            },
             "required": ["nota"],
+        },
+    },
+    {
+        "name": "buscar_memoria",
+        "description": "Busca en tu memoria a largo plazo notas que coincidan con una consulta o categoria.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"consulta": {"type": "string", "description": "Texto o categoria a buscar."}},
+            "required": [],
+        },
+    },
+    {
+        "name": "olvidar_memoria",
+        "description": "Borra una nota de la memoria a largo plazo, por su id o por parte de su texto.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ref": {"type": "string", "description": "Id de la nota o parte de su texto."}},
+            "required": ["ref"],
         },
     },
     {
@@ -280,6 +363,7 @@ TOOLS = [
 TOOLS += nt.NT_TOOLS
 TOOLS += tareas.TAREAS_TOOLS
 TOOLS += alertas.ALERTAS_TOOLS
+TOOLS += docs.DOCS_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero o tocan el
 # sistema): piden confirmacion en la terminal y van detras del modal en la web,
@@ -306,9 +390,21 @@ def tool_recordar(args: dict) -> str:
     nota = (args.get("nota") or "").strip()
     if not nota:
         return "No se indico que recordar."
-    if guardar_nota(nota):
-        return f"Anotado en memoria: {nota}"
+    cat = (args.get("categoria") or "general").strip().lower()
+    if guardar_nota(nota, cat):
+        return f"Anotado en memoria [{cat}]: {nota}"
     return f"Ya lo tenia recordado: {nota}"
+
+
+def tool_buscar_memoria(args: dict) -> str:
+    notas = buscar_notas(args.get("consulta", ""))
+    if not notas:
+        return "No encontre nada en memoria con esa consulta."
+    return "\n".join(f"[{n['id']}] ({n['categoria']}) {n['texto']}" for n in notas[:30])
+
+
+def tool_olvidar_memoria(args: dict) -> str:
+    return olvidar_nota(args.get("ref", ""))
 
 
 def tool_rastrear_ofertas(args: dict) -> str:
@@ -495,6 +591,8 @@ def tool_nt_cerrar(args: dict) -> str:
 
 EJECUTORES = {
     "recordar": tool_recordar,
+    "buscar_memoria": tool_buscar_memoria,
+    "olvidar_memoria": tool_olvidar_memoria,
     "rastrear_ofertas": tool_rastrear_ofertas,
     "run_command": tool_run_command,
     "read_file": tool_read_file,
@@ -513,6 +611,7 @@ EJECUTORES = {
 # Productividad (tareas/recordatorios) y alertas de precio: herramientas seguras.
 EJECUTORES.update(tareas.TAREAS_EJECUTORES)
 EJECUTORES.update(alertas.ALERTAS_EJECUTORES)
+EJECUTORES.update(docs.DOCS_EJECUTORES)
 
 
 def ejecutar_herramienta(name: str, args: dict) -> str:

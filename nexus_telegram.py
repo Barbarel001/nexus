@@ -35,6 +35,7 @@ import nexus_ollama
 import nexus_ninjatrader as nt
 import nexus_tareas as tareas
 import nexus_alertas as alertas
+import nexus_docs as docs
 
 TOKEN = nexus._env("NEXUS_TELEGRAM_TOKEN", "")
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -44,8 +45,9 @@ _ids = [s.strip() for s in nexus._env("NEXUS_TELEGRAM_CHAT_ID", "").replace(";",
 CHATS_PERMITIDOS = set(_ids)
 
 # Herramientas SEGURAS disponibles por Telegram (no mueven dinero).
-SEGURAS = ({"recordar", "rastrear_ofertas", "read_file", "list_directory"}
-           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS)
+SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
+            "read_file", "list_directory"}
+           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS)
 
 # Historial de conversacion por chat (en memoria; se reinicia con /nuevo).
 _historiales = {}

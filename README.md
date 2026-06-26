@@ -37,7 +37,8 @@ It's a compact but complete example of an **agentic application**, demonstrating
 
 | Area | What it does |
 |---|---|
-| 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
+| 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`), now with **categories, search and forget**, managed from a 🧠 panel in the web UI. |
+| 📚 **Docs / RAG** | Ask questions over **your own documents** (`.txt` / `.md` / `.pdf`): keyword retrieval over a docs folder — local and free, no paid embeddings. |
 | ✅ **Tasks & reminders** | Add / list / complete / delete tasks with **due dates** (`hoy`, `manana`, `AAAA-MM-DD`) and priority; overdue & due-today are flagged, and pending tasks greet you on startup (`tareas.json`). |
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`, task tools (`agregar_tarea`…), NinjaTrader tools (`nt_orden`…). |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
@@ -68,6 +69,7 @@ nexus_tareas.py   → Productivity: tasks & reminders (due dates, priority) pers
 nexus_alertas.py  → Price alerts on NinjaTrader instruments, persisted to alertas.json
 nexus_telegram.py → Telegram bot: control Nexus + notifications from anywhere (no tunnel)
 nexus_scheduler.py → Proactive jobs: alert watch + morning briefing (push via Telegram)
+nexus_docs.py     → Docs/RAG-lite: keyword search over your .txt/.md/.pdf files
 web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
 web/manifest.webmanifest, web/sw.js → PWA manifest + service worker (installable app)
 memoria.json      → Long-term memory (git-ignored; personal)
@@ -150,6 +152,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_BRIEFING_HORA` | *(none)* | Morning briefing time `HH:MM` (e.g. `08:00`); empty disables it |
 | `NEXUS_BRIEFING_INSTRUMENTOS` | *(none)* | Instruments to include in the briefing (comma-separated) |
 | `NEXUS_SCHED_INTERVALO` | `60` | Seconds between scheduler checks (alerts) |
+| `NEXUS_DOCS_DIR` | `documentos/` | Folder Nexus searches for your documents (RAG) |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
