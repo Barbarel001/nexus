@@ -525,6 +525,49 @@ def ejecutar_herramienta(name: str, args: dict) -> str:
         return f"Error ejecutando la herramienta {name}: {e}"
 
 
+def conversar(messages: list, system_prompt: str = None, tools: list = None,
+              ejecutar=None, model: str = None, max_iter: int = 10) -> tuple:
+    """Ejecuta un turno agentico COMPLETO (sin streaming) y devuelve (texto, usage).
+
+    Reutilizable por canales que no necesitan streaming (Telegram, scheduler, etc.).
+    `messages` se modifica in-place anadiendo las respuestas del modelo y los
+    resultados de herramientas, asi el llamador puede continuar la conversacion.
+    """
+    client = anthropic.Anthropic()
+    system_prompt = system_prompt if system_prompt is not None else construir_system_prompt()
+    tools = TOOLS if tools is None else tools
+    ejecutar = ejecutar or ejecutar_herramienta
+    model = model or MODEL
+    texto = ""
+    tin = tout = 0
+    for _ in range(max_iter):
+        kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system_prompt,
+                      tools=tools, messages=messages)
+        _th = thinking_para(model)
+        if _th:
+            kwargs["thinking"] = _th
+        resp = client.messages.create(**kwargs)
+        if getattr(resp, "usage", None):
+            tin += resp.usage.input_tokens
+            tout += resp.usage.output_tokens
+        messages.append({"role": "assistant", "content": resp.content})
+        for b in resp.content:
+            if getattr(b, "type", None) == "text":
+                texto += b.text
+        if resp.stop_reason == "tool_use":
+            resultados = []
+            for b in resp.content:
+                if getattr(b, "type", None) == "tool_use":
+                    salida = ejecutar(b.name, b.input)
+                    resultados.append({"type": "tool_result", "tool_use_id": b.id, "content": salida})
+            messages.append({"role": "user", "content": resultados})
+            continue
+        if resp.stop_reason == "pause_turn":
+            continue
+        break
+    return texto.strip(), {"in": tin, "out": tout}
+
+
 # ============================================================
 #  PROGRAMA PRINCIPAL
 # ============================================================

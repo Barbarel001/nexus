@@ -582,7 +582,21 @@ def main():
     if host not in ("127.0.0.1", "localhost") and not NEXUS_PASSWORD:
         print("  AVISO: estas exponiendo Nexus sin contrasena. Define NEXUS_PASSWORD "
               "para protegerlo antes de abrirlo fuera de tu red.")
+    # Canales proactivos: bot de Telegram + scheduler (resumen matutino / alertas).
+    _arrancar_proactivo()
     app.run(host=host, port=port, threaded=True)
+
+
+def _arrancar_proactivo():
+    """Arranca, en hilos daemon, el bot de Telegram y el scheduler si estan configurados."""
+    try:
+        import nexus_telegram, nexus_scheduler
+        if nexus_telegram.configurado():
+            threading.Thread(target=nexus_telegram.run, daemon=True, name="nexus-telegram").start()
+            nexus_scheduler.iniciar_en_hilo()
+            print("  [Telegram + scheduler proactivo activos]")
+    except Exception as e:
+        print(f"  (no se pudo iniciar el modo proactivo: {e})")
 
 
 if __name__ == "__main__":

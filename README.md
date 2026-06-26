@@ -46,6 +46,8 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🚨 **Price alerts** | "Avísame si el ES toca 5000": create/list/delete alerts; the web panel polls and fires a **browser notification** when one triggers. |
 | 🛡️ **Bracket orders (OCO)** | `nt_orden` can attach a **stop-loss** and **take-profit**; Nexus sends them as an OCO so one cancels the other. |
 | 🎨 **Theme & PWA** | Light/dark theme + accent color picker; **installable as a PWA** (manifest + service worker) to use Nexus like a native app on your phone. |
+| 🤖 **Telegram bot** | Control Nexus and get notifications from anywhere (no tunnel): chat, tasks, alerts, prices — with a chat-id allowlist. Money-moving tools are disabled over Telegram. |
+| ⏰ **Proactive scheduler** | Watches your price alerts and pushes a Telegram message when one triggers; sends a **morning briefing** (tasks due, alerts, prices) at a time you choose. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -64,6 +66,8 @@ nexus_ollama.py   → Optional LOCAL backend (Ollama): runs a model on your PC, 
 nexus_ninjatrader.py → NinjaTrader 8 bridge: builds/sends order files, reads prices (file AT Interface)
 nexus_tareas.py   → Productivity: tasks & reminders (due dates, priority) persisted to tareas.json
 nexus_alertas.py  → Price alerts on NinjaTrader instruments, persisted to alertas.json
+nexus_telegram.py → Telegram bot: control Nexus + notifications from anywhere (no tunnel)
+nexus_scheduler.py → Proactive jobs: alert watch + morning briefing (push via Telegram)
 web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
 web/manifest.webmanifest, web/sw.js → PWA manifest + service worker (installable app)
 memoria.json      → Long-term memory (git-ignored; personal)
@@ -138,6 +142,11 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
 | `NEXUS_ALERTAS_PATH` | `alertas.json` | Where price alerts are stored (git-ignored) |
 | `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
+| `NEXUS_TELEGRAM_TOKEN` | *(none)* | Telegram bot token (from @BotFather). Enables the bot + proactive scheduler |
+| `NEXUS_TELEGRAM_CHAT_ID` | *(none)* | Allowed chat id(s), comma-separated. Strongly recommended (otherwise anyone can use the bot) |
+| `NEXUS_BRIEFING_HORA` | *(none)* | Morning briefing time `HH:MM` (e.g. `08:00`); empty disables it |
+| `NEXUS_BRIEFING_INSTRUMENTOS` | *(none)* | Instruments to include in the briefing (comma-separated) |
+| `NEXUS_SCHED_INTERVALO` | `60` | Seconds between scheduler checks (alerts) |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
@@ -158,6 +167,27 @@ setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
 
 In local mode **no API key is required** and every turn costs **$0**. Tool-use and
 streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
+
+## Telegram bot + proactive mode
+
+Control Nexus and get notifications **from anywhere** — no tunnel, no public IP.
+
+1. In Telegram, talk to **@BotFather** → `/newbot` → copy the **token**.
+2. Get your **chat id**: message your bot, then open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `"chat":{"id": …}`.
+3. Launch with the env vars set (Windows shown):
+   ```powershell
+   $env:NEXUS_TELEGRAM_TOKEN="123456:ABC..."
+   $env:NEXUS_TELEGRAM_CHAT_ID="<your-chat-id>"
+   $env:NEXUS_BRIEFING_HORA="08:00"          # optional morning briefing
+   python nexus_web.py                        # bot + scheduler start with the server
+   # or run only the bot:  python nexus_telegram.py
+   ```
+
+Now you can text Nexus (tasks, reminders, alerts, prices, memory). Commands:
+`/start`, `/nuevo`, `/tareas`, `/alertas`. The **scheduler** watches your price
+alerts and pings you when one triggers, and sends a **morning briefing**. For safety,
+money-moving trade tools are **not** available over Telegram — use the web/terminal.
 
 ## Tasks & reminders
 
