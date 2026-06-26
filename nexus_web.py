@@ -31,8 +31,10 @@ try:
     import anthropic  # noqa: F401
 except ImportError:
     sys.exit("Falta 'anthropic'. Ejecuta: pip install anthropic")
+import hmac
 try:
-    from flask import Flask, request, Response, send_from_directory, jsonify
+    from flask import (Flask, request, Response, send_from_directory, jsonify,
+                       session, redirect, render_template_string)
 except ImportError:
     sys.exit("Falta 'flask'. Ejecuta: pip install flask")
 
@@ -75,6 +77,69 @@ else:
 MODELOS_OK = {"claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"}
 
 app = Flask(__name__, static_folder=None)
+
+# ---------------- Autenticacion opcional (para exponer Nexus fuera de casa) -------
+# Si defines NEXUS_PASSWORD, Nexus pide login antes de dar acceso. Sin esa variable,
+# no hay login (uso local de siempre). Pensado para abrirlo por un tunel publico.
+NEXUS_PASSWORD = nexus._env("NEXUS_PASSWORD", "")
+app.secret_key = nexus._env("NEXUS_SECRET", "") or os.urandom(24)
+app.permanent_session_lifetime = datetime.timedelta(days=30)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+
+LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS — Acceso</title>
+<style>
+ *{box-sizing:border-box} html,body{height:100%;margin:0}
+ body{font-family:system-ui,'Segoe UI',Roboto,sans-serif;background:radial-gradient(900px 500px at 60% -160px,rgba(56,189,248,.10),transparent 70%),#0a0f1a;
+   color:#e6edf5;display:flex;align-items:center;justify-content:center}
+ .box{width:100%;max-width:340px;padding:30px 26px;background:#121a28;border:1px solid rgba(148,163,184,.20);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+ .logo{font-family:'Orbitron',sans-serif;font-weight:800;font-size:26px;letter-spacing:6px;text-align:center;margin-bottom:4px;color:#f1f7fb}
+ .sub{text-align:center;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#5f6e82;margin-bottom:22px}
+ input{width:100%;height:46px;background:#0d1420;border:1px solid rgba(148,163,184,.30);color:#e6edf5;font-size:15px;padding:0 14px;border-radius:11px;outline:none;margin-bottom:14px}
+ input:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+ button{width:100%;height:46px;background:#38bdf8;border:none;color:#04121d;font-weight:600;font-size:15px;border-radius:11px;cursor:pointer}
+ button:hover{filter:brightness(1.08)}
+ .err{color:#f87171;font-size:13px;text-align:center;margin-bottom:12px;min-height:18px}
+</style></head><body>
+ <form class="box" method="POST" action="/login">
+   <div class="logo">NEXUS</div><div class="sub">Acceso privado</div>
+   <div class="err">{{ error }}</div>
+   <input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">
+   <button type="submit">Entrar</button>
+ </form>
+</body></html>"""
+
+
+@app.before_request
+def _guardia_acceso():
+    """Si hay NEXUS_PASSWORD, exige login para todo salvo la propia pagina de login."""
+    if not NEXUS_PASSWORD:
+        return None
+    if request.endpoint == "login" or session.get("auth"):
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "no autorizado"}), 401
+    return redirect("/login")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not NEXUS_PASSWORD:
+        return redirect("/")
+    error = ""
+    if request.method == "POST":
+        if hmac.compare_digest(request.form.get("password", ""), NEXUS_PASSWORD):
+            session["auth"] = True
+            session.permanent = True
+            return redirect("/")
+        error = "Contraseña incorrecta."
+    return render_template_string(LOGIN_HTML, error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 # Registro de confirmaciones pendientes (handshake SSE <-> /api/confirm).
 _pendientes = {}
@@ -514,6 +579,9 @@ def main():
     extra = "  [acciones de sistema ON]" if WEB_ACCIONES else ""
     red = "  [accesible en tu red local]" if host not in ("127.0.0.1", "localhost") else ""
     print(f"NEXUS web encendido en {url}{extra}{red}   (Ctrl+C para detener)")
+    if host not in ("127.0.0.1", "localhost") and not NEXUS_PASSWORD:
+        print("  AVISO: estas exponiendo Nexus sin contrasena. Define NEXUS_PASSWORD "
+              "para protegerlo antes de abrirlo fuera de tu red.")
     app.run(host=host, port=port, threaded=True)
 
 

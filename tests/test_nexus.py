@@ -199,3 +199,29 @@ def test_confirm_rid_desconocido():
 def test_resumen_accion():
     assert "echo hola" in nexus_web.resumen_accion("run_command", {"command": "echo hola"})
     assert "archivo" in nexus_web.resumen_accion("write_file", {"path": "x.txt", "content": "ab"}).lower()
+
+
+# --------------------------- Autenticacion (login opcional) ---------------------------
+
+def test_sin_password_no_pide_login():
+    """Por defecto (sin NEXUS_PASSWORD) no hay login: el uso local sigue igual."""
+    c = nexus_web.app.test_client()
+    assert c.get("/api/config").status_code == 200
+
+
+def test_con_password_bloquea_y_permite(monkeypatch):
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "secreta123")
+    c = nexus_web.app.test_client()
+    # sin login: la API responde 401 y las paginas redirigen al login
+    assert c.get("/api/config").status_code == 401
+    assert c.get("/").status_code in (301, 302)
+    # login con clave incorrecta no autentica
+    c.post("/login", data={"password": "mala"})
+    assert c.get("/api/config").status_code == 401
+    # login correcto: ya hay acceso
+    r = c.post("/login", data={"password": "secreta123"})
+    assert r.status_code in (301, 302)
+    assert c.get("/api/config").status_code == 200
+    # logout vuelve a bloquear
+    c.get("/logout")
+    assert c.get("/api/config").status_code == 401
