@@ -40,13 +40,15 @@ import anthropic
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
+import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
 
-# Herramientas de solo-lectura, siempre disponibles en la web (incluye lectura
-# de NinjaTrader: estado, precio y posicion -- no mueven dinero).
-SEGURAS = {"recordar", "rastrear_ofertas", "read_file", "list_directory"} | nt.NT_SEGURAS
+# Herramientas seguras, siempre disponibles en la web: lectura general, lectura de
+# NinjaTrader (estado/precio/posicion, no mueven dinero) y productividad (tareas).
+SEGURAS = ({"recordar", "rastrear_ofertas", "read_file", "list_directory"}
+           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS

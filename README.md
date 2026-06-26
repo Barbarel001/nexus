@@ -36,7 +36,8 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | Area | What it does |
 |---|---|
 | 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`). |
-| 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`. |
+| ✅ **Tasks & reminders** | Add / list / complete / delete tasks with **due dates** (`hoy`, `manana`, `AAAA-MM-DD`) and priority; overdue & due-today are flagged, and pending tasks greet you on startup (`tareas.json`). |
+| 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`, task tools (`agregar_tarea`…), NinjaTrader tools (`nt_orden`…). |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
@@ -55,6 +56,7 @@ nexus.py          → Terminal agent: agentic loop + tool dispatch + adaptive th
 nexus_web.py      → Flask server: SSE streaming, conversation persistence, web-safe tools
 nexus_ollama.py   → Optional LOCAL backend (Ollama): runs a model on your PC, $0 / no API tokens
 nexus_ninjatrader.py → NinjaTrader 8 bridge: builds/sends order files, reads prices (file AT Interface)
+nexus_tareas.py   → Productivity: tasks & reminders (due dates, priority) persisted to tareas.json
 web/index.html    → HUD front-end: streaming render, history sidebar, voice (TTS/STT)
 memoria.json      → Long-term memory (git-ignored; personal)
 conversaciones.json → Web chat history (git-ignored; personal)
@@ -121,6 +123,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NT_FOLDER` | *(auto)* | NinjaTrader 8 `incoming` folder (auto-detected under `Documents/NinjaTrader 8/incoming`) |
 | `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
 | `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
+| `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
@@ -141,6 +144,21 @@ setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
 
 In local mode **no API key is required** and every turn costs **$0**. Tool-use and
 streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
+
+## Tasks & reminders
+
+Nexus doubles as a lightweight personal organizer. Just talk to it:
+
+- "Recuérdame pagar la luz mañana." → creates a task due tomorrow.
+- "¿Qué tengo pendiente?" / "¿Qué vence hoy?" → lists tasks (overdue and due-today flagged).
+- "Marca como hecha la del banco." → completes it.
+
+Tasks carry a **due date** (`hoy`, `manana`, or `AAAA-MM-DD`) and a **priority**
+(`alta` / `media` / `baja`), are sorted by soonest deadline, and live in
+`tareas.json` (git-ignored, personal). On terminal startup Nexus greets you with a
+one-line summary of what's pending, overdue and due today. Tools: `agregar_tarea`,
+`listar_tareas`, `completar_tarea`, `eliminar_tarea` — all read/write only Nexus's
+own file, so they're available in the web UI too, no confirmation needed.
 
 ## NinjaTrader (trading from Nexus)
 
@@ -212,6 +230,7 @@ never published.
 - [x] Tool-use chips shown when reopening a conversation
 - [x] Local model backend (Ollama) — $0, no API tokens
 - [x] NinjaTrader 8 bridge (file AT Interface): prices, positions, place/cancel/close orders
+- [x] Tasks & reminders (due dates, priority) with startup summary
 - [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 

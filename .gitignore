@@ -1,6 +1,7 @@
 # Datos personales de Nexus (NO publicar)
 memoria.json
 conversaciones.json
+tareas.json
 
 # Variables de entorno / secretos
 .env
