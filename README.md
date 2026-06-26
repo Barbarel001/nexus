@@ -39,7 +39,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 |---|---|
 | 🧠 **Persistent memory** | Remembers your name, preferences, goals and project facts between runs (`memoria.json`), now with **categories, search and forget**, managed from a 🧠 panel in the web UI. |
 | 📚 **Docs / RAG** | Ask questions over **your own documents** (`.txt` / `.md` / `.pdf`): keyword retrieval over a docs folder — local and free, no paid embeddings. |
-| ✅ **Tasks & reminders** | Add / list / complete / delete tasks with **due dates** (`hoy`, `manana`, `AAAA-MM-DD`) and priority; overdue & due-today are flagged, and pending tasks greet you on startup (`tareas.json`). |
+| ✅ **Tasks & reminders** | Add / list / complete / delete tasks with **due dates** (`hoy`, `manana`, `AAAA-MM-DD`), priority, **tags, projects and recurrence** (daily/weekly/monthly auto-recreate); overdue & due-today flagged; pending tasks greet you on startup (`tareas.json`). |
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`, task tools (`agregar_tarea`…), NinjaTrader tools (`nt_orden`…). |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |

@@ -76,16 +76,53 @@ def _vencimiento(t: dict):
         return None
 
 
+RECURRENCIAS = {"diaria", "semanal", "mensual"}
+_REC_ALIAS = {"diario": "diaria", "daily": "diaria", "semana": "semanal", "weekly": "semanal",
+              "mes": "mensual", "mensaul": "mensual", "monthly": "mensual"}
+
+
+def normalizar_recurrencia(texto: str) -> str:
+    t = (texto or "").strip().lower()
+    if not t:
+        return ""
+    t = _REC_ALIAS.get(t, t)
+    return t if t in RECURRENCIAS else ""
+
+
+def _siguiente_fecha(vence_iso: str, recurrencia: str) -> str:
+    """Avanza una fecha segun la recurrencia (para recrear tareas recurrentes)."""
+    base = None
+    try:
+        base = datetime.date.fromisoformat(vence_iso)
+    except (ValueError, TypeError):
+        base = _hoy()
+    if recurrencia == "diaria":
+        return (base + datetime.timedelta(days=1)).isoformat()
+    if recurrencia == "semanal":
+        return (base + datetime.timedelta(days=7)).isoformat()
+    if recurrencia == "mensual":
+        mes = base.month + 1
+        anio = base.year + (mes - 1) // 12
+        mes = (mes - 1) % 12 + 1
+        dia = min(base.day, 28)  # evita dias invalidos (29-31)
+        return datetime.date(anio, mes, dia).isoformat()
+    return ""
+
+
 # --------------------------- Operaciones ---------------------------
 
-def agregar(texto: str, vence: str = "", prioridad: str = "media") -> dict:
-    """Crea una tarea y la guarda. Devuelve la tarea creada."""
+def agregar(texto: str, vence: str = "", prioridad: str = "media",
+            etiquetas=None, proyecto: str = "", recurrencia: str = "") -> dict:
+    """Crea una tarea y la guarda. Soporta etiquetas, proyecto y recurrencia."""
     texto = (texto or "").strip()
     if not texto:
         raise ValueError("La tarea no puede estar vacia.")
     prioridad = (prioridad or "media").strip().lower()
     if prioridad not in PRIORIDADES:
         prioridad = "media"
+    if isinstance(etiquetas, str):
+        etiquetas = [e.strip() for e in etiquetas.replace(";", ",").split(",") if e.strip()]
+    etiquetas = [str(e).strip().lower() for e in (etiquetas or []) if str(e).strip()]
     tarea = {
         "id": uuid.uuid4().hex[:6],
         "texto": texto,
@@ -93,6 +130,9 @@ def agregar(texto: str, vence: str = "", prioridad: str = "media") -> dict:
         "creada": _hoy().isoformat(),
         "vence": normalizar_fecha(vence),
         "prioridad": prioridad,
+        "etiquetas": etiquetas,
+        "proyecto": (proyecto or "").strip(),
+        "recurrencia": normalizar_recurrencia(recurrencia),
     }
     tareas = cargar()
     tareas.append(tarea)
@@ -113,9 +153,9 @@ def _ordenar(tareas: list) -> list:
     ))
 
 
-def filtrar(filtro: str = "pendientes") -> list:
-    """Devuelve la lista de tareas segun el filtro: 'pendientes' (defecto), 'todas',
-    'hechas', 'hoy' (vencen hoy y pendientes), 'vencidas' (atrasadas y pendientes)."""
+def filtrar(filtro: str = "pendientes", proyecto: str = "", etiqueta: str = "") -> list:
+    """Devuelve la lista de tareas segun el filtro de estado ('pendientes' por defecto,
+    'todas', 'hechas', 'hoy', 'vencidas') y, opcionalmente, por proyecto y/o etiqueta."""
     filtro = (filtro or "pendientes").strip().lower()
     tareas = cargar()
     hoy = _hoy()
@@ -129,7 +169,23 @@ def filtrar(filtro: str = "pendientes") -> list:
         sel = [t for t in tareas if not t.get("hecha") and _vencimiento(t) and _vencimiento(t) < hoy]
     else:  # pendientes
         sel = [t for t in tareas if not t.get("hecha")]
+    proyecto = (proyecto or "").strip().lower()
+    if proyecto:
+        sel = [t for t in sel if (t.get("proyecto") or "").lower() == proyecto]
+    etiqueta = (etiqueta or "").strip().lower()
+    if etiqueta:
+        sel = [t for t in sel if etiqueta in [e.lower() for e in t.get("etiquetas", [])]]
     return _ordenar(sel)
+
+
+def proyectos() -> list:
+    """Lista los nombres de proyecto en uso (no vacios)."""
+    vistos = []
+    for t in cargar():
+        p = (t.get("proyecto") or "").strip()
+        if p and p not in vistos:
+            vistos.append(p)
+    return vistos
 
 
 def _coincidencias(ref: str, tareas: list) -> list:
@@ -155,8 +211,21 @@ def completar(ref: str) -> str:
     for t in tareas:
         if t["id"] == objetivo["id"]:
             t["hecha"] = True
+    extra = ""
+    # Tarea recurrente: al completarla, se recrea la siguiente ocurrencia.
+    rec = normalizar_recurrencia(objetivo.get("recurrencia", ""))
+    if rec:
+        sig = _siguiente_fecha(objetivo.get("vence", ""), rec)
+        tareas.append({
+            "id": uuid.uuid4().hex[:6], "texto": objetivo["texto"], "hecha": False,
+            "creada": _hoy().isoformat(), "vence": sig,
+            "prioridad": objetivo.get("prioridad", "media"),
+            "etiquetas": objetivo.get("etiquetas", []), "proyecto": objetivo.get("proyecto", ""),
+            "recurrencia": rec,
+        })
+        extra = f" (recurrente: recreada para {sig})"
     guardar(tareas)
-    return f"Tarea completada: {objetivo['texto']}"
+    return f"Tarea completada: {objetivo['texto']}{extra}"
 
 
 def eliminar(ref: str) -> str:
@@ -192,7 +261,15 @@ def _linea(t: dict) -> str:
         else:
             etiqueta = f"vence en {dias}d ({t['vence']})"
         cola = f"  -> {etiqueta}"
-    return f"[{estado}] {marca} {t['id']}  {t['texto']}{cola}"
+    meta = []
+    if t.get("proyecto"):
+        meta.append(f"#{t['proyecto']}")
+    if t.get("etiquetas"):
+        meta.append(" ".join(f"@{e}" for e in t["etiquetas"]))
+    if t.get("recurrencia"):
+        meta.append(f"↻{t['recurrencia']}")
+    cola_meta = ("  " + " ".join(meta)) if meta else ""
+    return f"[{estado}] {marca} {t['id']}  {t['texto']}{cola}{cola_meta}"
 
 
 def render(tareas: list, vacio: str = "No hay tareas.") -> str:
@@ -220,7 +297,9 @@ def dto(t: dict) -> dict:
             sev, etiqueta = "futura", f"en {dias}d"
     return {"id": t["id"], "texto": t["texto"], "prioridad": t.get("prioridad", "media"),
             "hecha": bool(t.get("hecha")), "vence": t.get("vence", ""),
-            "sev": sev, "etiqueta": etiqueta}
+            "sev": sev, "etiqueta": etiqueta,
+            "etiquetas": t.get("etiquetas", []), "proyecto": t.get("proyecto", ""),
+            "recurrencia": t.get("recurrencia", "")}
 
 
 def resumen_pendientes() -> str:
@@ -244,19 +323,34 @@ def resumen_pendientes() -> str:
 
 def tool_agregar_tarea(args: dict) -> str:
     try:
-        t = agregar(args.get("texto", ""), args.get("vence", ""), args.get("prioridad", "media"))
+        t = agregar(args.get("texto", ""), args.get("vence", ""), args.get("prioridad", "media"),
+                    etiquetas=args.get("etiquetas"), proyecto=args.get("proyecto", ""),
+                    recurrencia=args.get("recurrencia", ""))
     except ValueError as e:
         return f"No pude crear la tarea: {e}"
-    extra = f" (vence {t['vence']})" if t["vence"] else ""
-    return f"Tarea anotada [{t['id']}]: {t['texto']}{extra}"
+    extra = []
+    if t["vence"]:
+        extra.append(f"vence {t['vence']}")
+    if t["proyecto"]:
+        extra.append(f"proyecto {t['proyecto']}")
+    if t["recurrencia"]:
+        extra.append(f"recurrente {t['recurrencia']}")
+    cola = f" ({', '.join(extra)})" if extra else ""
+    return f"Tarea anotada [{t['id']}]: {t['texto']}{cola}"
 
 
 def tool_listar_tareas(args: dict) -> str:
     filtro = args.get("filtro", "pendientes")
+    sel = filtrar(filtro, proyecto=args.get("proyecto", ""), etiqueta=args.get("etiqueta", ""))
     vacios = {"pendientes": "No tienes tareas pendientes.", "hechas": "No hay tareas completadas.",
               "hoy": "Nada vence hoy.", "vencidas": "No tienes tareas vencidas.",
               "todas": "No hay tareas."}
-    return render(filtrar(filtro), vacios.get((filtro or "").lower(), "No hay tareas."))
+    return render(sel, vacios.get((filtro or "").lower(), "No hay tareas."))
+
+
+def tool_proyectos(args: dict) -> str:
+    p = proyectos()
+    return ("Proyectos: " + ", ".join(p)) if p else "No tienes proyectos definidos."
 
 
 def tool_completar_tarea(args: dict) -> str:
@@ -270,28 +364,41 @@ def tool_eliminar_tarea(args: dict) -> str:
 TAREAS_TOOLS = [
     {
         "name": "agregar_tarea",
-        "description": ("Anota una tarea o recordatorio en la lista del usuario. Usa 'vence' "
-                        "para recordatorios con fecha (AAAA-MM-DD, 'hoy' o 'manana') y "
-                        "'prioridad' (alta/media/baja)."),
+        "description": ("Anota una tarea o recordatorio. 'vence' (AAAA-MM-DD, 'hoy' o 'manana'), "
+                        "'prioridad' (alta/media/baja), 'etiquetas' (lista o texto separado por "
+                        "comas), 'proyecto' (nombre) y 'recurrencia' (diaria/semanal/mensual: al "
+                        "completarla se recrea automaticamente)."),
         "input_schema": {
             "type": "object",
             "properties": {
                 "texto": {"type": "string", "description": "Descripcion de la tarea."},
                 "vence": {"type": "string", "description": "Fecha limite opcional: AAAA-MM-DD, 'hoy' o 'manana'."},
                 "prioridad": {"type": "string", "description": "alta, media (defecto) o baja."},
+                "etiquetas": {"type": "string", "description": "Etiquetas separadas por comas (ej. 'casa, urgente')."},
+                "proyecto": {"type": "string", "description": "Nombre del proyecto al que pertenece."},
+                "recurrencia": {"type": "string", "description": "diaria, semanal o mensual (opcional)."},
             },
             "required": ["texto"],
         },
     },
     {
         "name": "listar_tareas",
-        "description": ("Muestra las tareas del usuario. filtro: 'pendientes' (defecto), 'todas', "
-                        "'hechas', 'hoy' (vencen hoy) o 'vencidas' (atrasadas)."),
+        "description": ("Muestra las tareas. filtro: 'pendientes' (defecto), 'todas', 'hechas', "
+                        "'hoy' o 'vencidas'. Opcional: 'proyecto' y/o 'etiqueta' para acotar."),
         "input_schema": {
             "type": "object",
-            "properties": {"filtro": {"type": "string", "description": "pendientes/todas/hechas/hoy/vencidas."}},
+            "properties": {
+                "filtro": {"type": "string", "description": "pendientes/todas/hechas/hoy/vencidas."},
+                "proyecto": {"type": "string", "description": "Filtrar por proyecto (opcional)."},
+                "etiqueta": {"type": "string", "description": "Filtrar por etiqueta (opcional)."},
+            },
             "required": [],
         },
+    },
+    {
+        "name": "listar_proyectos",
+        "description": "Lista los proyectos en uso en tus tareas.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "completar_tarea",
@@ -314,11 +421,13 @@ TAREAS_TOOLS = [
 ]
 
 # Todas son de solo escritura sobre el archivo propio de Nexus: SEGURAS.
-TAREAS_SEGURAS = {"agregar_tarea", "listar_tareas", "completar_tarea", "eliminar_tarea"}
+TAREAS_SEGURAS = {"agregar_tarea", "listar_tareas", "completar_tarea", "eliminar_tarea",
+                  "listar_proyectos"}
 
 TAREAS_EJECUTORES = {
     "agregar_tarea": tool_agregar_tarea,
     "listar_tareas": tool_listar_tareas,
     "completar_tarea": tool_completar_tarea,
     "eliminar_tarea": tool_eliminar_tarea,
+    "listar_proyectos": tool_proyectos,
 }

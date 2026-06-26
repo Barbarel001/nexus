@@ -178,3 +178,52 @@ def test_api_completar_sin_ref():
     c = nexus_web.app.test_client()
     r = c.post("/api/tarea/completar", json={})
     assert r.status_code == 400
+
+
+# --------------------------- Productividad pro ---------------------------
+
+def test_etiquetas_y_proyecto():
+    t = tareas.agregar("Diseñar logo", etiquetas="diseño, urgente", proyecto="Marca")
+    assert t["etiquetas"] == ["diseño", "urgente"] and t["proyecto"] == "Marca"
+    assert tareas.proyectos() == ["Marca"]
+
+
+def test_filtro_por_proyecto_y_etiqueta():
+    tareas.agregar("A", proyecto="Web", etiquetas="frontend")
+    tareas.agregar("B", proyecto="Web", etiquetas="backend")
+    tareas.agregar("C", proyecto="Bot")
+    assert len(tareas.filtrar("pendientes", proyecto="Web")) == 2
+    assert len(tareas.filtrar("pendientes", etiqueta="backend")) == 1
+
+
+def test_normalizar_recurrencia():
+    assert tareas.normalizar_recurrencia("diario") == "diaria"
+    assert tareas.normalizar_recurrencia("weekly") == "semanal"
+    assert tareas.normalizar_recurrencia("nada") == ""
+
+
+def test_siguiente_fecha():
+    assert tareas._siguiente_fecha("2026-06-26", "diaria") == "2026-06-27"
+    assert tareas._siguiente_fecha("2026-06-26", "semanal") == "2026-07-03"
+    assert tareas._siguiente_fecha("2026-01-31", "mensual") == "2026-02-28"  # evita dia invalido
+
+
+def test_tarea_recurrente_se_recrea():
+    t = tareas.agregar("Revisar mercado", vence="2026-06-26", recurrencia="diaria")
+    out = tareas.completar(t["id"])
+    assert "recurrente" in out.lower()
+    pend = tareas.filtrar("pendientes")
+    assert len(pend) == 1 and pend[0]["vence"] == "2026-06-27"  # nueva ocurrencia
+    assert pend[0]["recurrencia"] == "diaria"
+
+
+def test_tarea_no_recurrente_no_se_recrea():
+    t = tareas.agregar("Una sola vez")
+    tareas.completar(t["id"])
+    assert tareas.filtrar("pendientes") == []
+
+
+def test_tool_agregar_con_proyecto():
+    out = tareas.tool_agregar_tarea({"texto": "X", "proyecto": "Casa", "recurrencia": "semanal"})
+    assert "proyecto Casa" in out and "recurrente semanal" in out
+    assert "Casa" in tareas.tool_proyectos({})
