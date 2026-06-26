@@ -137,3 +137,44 @@ def test_tools_registradas_en_nexus():
 
 def test_tareas_no_son_peligrosas():
     assert not (tareas.TAREAS_SEGURAS & nexus.HERRAMIENTAS_PELIGROSAS)
+
+
+# --------------------------- DTO para la web ---------------------------
+
+def test_dto_severidad():
+    import datetime as _dt
+    ayer = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+    t = tareas.agregar("Pagar", vence=ayer, prioridad="alta")
+    d = tareas.dto(t)
+    assert d["sev"] == "vencida" and d["prioridad"] == "alta"
+    assert d["id"] == t["id"] and "vencida" in d["etiqueta"]
+
+
+# --------------------------- Endpoints del panel (web) ---------------------------
+
+def test_api_panel():
+    import nexus_web
+    tareas.agregar("Tarea del panel")
+    c = nexus_web.app.test_client()
+    r = c.get("/api/panel")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "nt" in data and "tareas" in data
+    assert any(t["texto"] == "Tarea del panel" for t in data["tareas"])
+    assert "ok" in data["nt"] and "cuenta" in data["nt"]
+
+
+def test_api_completar_tarea():
+    import nexus_web
+    t = tareas.agregar("Completar via API")
+    c = nexus_web.app.test_client()
+    r = c.post("/api/tarea/completar", json={"ref": t["id"]})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert tareas.filtrar("pendientes") == []
+
+
+def test_api_completar_sin_ref():
+    import nexus_web
+    c = nexus_web.app.test_client()
+    r = c.post("/api/tarea/completar", json={})
+    assert r.status_code == 400

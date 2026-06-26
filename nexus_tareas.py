@@ -201,6 +201,28 @@ def render(tareas: list, vacio: str = "No hay tareas.") -> str:
     return "\n".join(_linea(t) for t in tareas)
 
 
+def dto(t: dict) -> dict:
+    """Representacion de una tarea para la web (incluye etiqueta y severidad de
+    vencimiento ya calculadas: 'vencida' / 'hoy' / 'futura' / 'none')."""
+    v = _vencimiento(t)
+    sev, etiqueta = "none", ""
+    if v:
+        dias = (v - _hoy()).days
+        if t.get("hecha"):
+            sev, etiqueta = "hecha", f"vencia {t['vence']}"
+        elif dias < 0:
+            sev, etiqueta = "vencida", f"vencida ({t['vence']})"
+        elif dias == 0:
+            sev, etiqueta = "hoy", "vence hoy"
+        elif dias == 1:
+            sev, etiqueta = "futura", "vence manana"
+        else:
+            sev, etiqueta = "futura", f"en {dias}d"
+    return {"id": t["id"], "texto": t["texto"], "prioridad": t.get("prioridad", "media"),
+            "hecha": bool(t.get("hecha")), "vence": t.get("vence", ""),
+            "sev": sev, "etiqueta": etiqueta}
+
+
 def resumen_pendientes() -> str:
     """Resumen corto para mostrar al iniciar: pendientes, vencidas y de hoy."""
     pend = filtrar("pendientes")

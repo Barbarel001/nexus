@@ -40,6 +40,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`, task tools (`agregar_tarea`…), NinjaTrader tools (`nt_orden`…). |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
+| 📊 **Dashboard panel** | Right-side panel in the web UI: NinjaTrader connection status, a live **price watchlist**, and your **pending tasks** with one-click complete — auto-refreshing. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -231,6 +232,7 @@ never published.
 - [x] Local model backend (Ollama) — $0, no API tokens
 - [x] NinjaTrader 8 bridge (file AT Interface): prices, positions, place/cancel/close orders
 - [x] Tasks & reminders (due dates, priority) with startup summary
+- [x] Web dashboard panel: NinjaTrader status, price watchlist, pending tasks
 - [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 

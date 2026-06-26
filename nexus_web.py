@@ -170,6 +170,41 @@ def config():
                     "ollama_disponible": nexus_ollama.disponible()})
 
 
+@app.route("/api/panel")
+def panel():
+    """Datos para el panel-dashboard: estado de NinjaTrader y tareas pendientes."""
+    return jsonify({
+        "nt": {"ok": nt.carpeta_ok(), "carpeta": nt.NT_FOLDER, "cuenta": nt.NT_ACCOUNT},
+        "tareas": [tareas.dto(t) for t in tareas.filtrar("pendientes")],
+        "resumen": tareas.resumen_pendientes(),
+    })
+
+
+@app.route("/api/nt/precio")
+def nt_precio_api():
+    """Precio de un instrumento via NinjaTrader (para la watchlist del panel)."""
+    inst = (request.args.get("instrument") or "").strip()
+    tipo = (request.args.get("tipo") or "LAST").strip().upper()
+    if not inst:
+        return jsonify({"ok": False, "error": "falta el instrumento"}), 400
+    try:
+        valor = nt.leer_precio(inst, tipo)
+        return jsonify({"ok": True, "instrument": inst.upper(), "tipo": tipo, "precio": valor})
+    except Exception as e:
+        return jsonify({"ok": False, "instrument": inst.upper(), "error": str(e)})
+
+
+@app.route("/api/tarea/completar", methods=["POST"])
+def completar_tarea_api():
+    """Marca una tarea como completada desde el panel."""
+    body = request.get_json(silent=True) or {}
+    ref = (body.get("ref") or "").strip()
+    if not ref:
+        return jsonify({"ok": False, "error": "falta ref"}), 400
+    msg = tareas.completar(ref)
+    return jsonify({"ok": "completada" in msg.lower(), "msg": msg})
+
+
 @app.route("/api/conversaciones")
 def listar_convs():
     data = cargar_convs()
