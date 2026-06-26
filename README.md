@@ -6,6 +6,8 @@
 
 ![Nexus — web HUD](docs/nexus-hero.svg)
 
+![Nexus — demo](docs/nexus-demo.gif)
+
 A personal AI assistant built in **Python** on top of the **Claude API (Anthropic)**.
 It is a real **tool-using agent**: it holds a conversation, **remembers things across
 sessions**, tracks real freelance job listings, searches the web, and can read/write
@@ -40,7 +42,10 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🛠️ **Tool use** | `recordar`, `rastrear_ofertas`, `web_search`, `run_command`, `read_file`, `write_file`, `list_directory`, task tools (`agregar_tarea`…), NinjaTrader tools (`nt_orden`…). |
 | 💼 **Job tracker** | Pulls **real** remote/freelance listings from Remotive, RemoteOK, Arbeitnow and Jobicy by keyword. |
 | 🌐 **Web HUD** | Flask + SSE streaming, sidebar with conversation history (open / rename / search / delete / export to Markdown), markdown rendering, responsive layout. |
-| 📊 **Dashboard panel** | Right-side panel in the web UI: NinjaTrader connection status, a live **price watchlist**, and your **pending tasks** with one-click complete — auto-refreshing. |
+| 📊 **Dashboard panel** | Right-side panel in the web UI: NinjaTrader status, a live **price watchlist** with **% change + sparklines**, **price alerts** (browser notifications), and **tasks** (filter + add + complete) — auto-refreshing. |
+| 🚨 **Price alerts** | "Avísame si el ES toca 5000": create/list/delete alerts; the web panel polls and fires a **browser notification** when one triggers. |
+| 🛡️ **Bracket orders (OCO)** | `nt_orden` can attach a **stop-loss** and **take-profit**; Nexus sends them as an OCO so one cancels the other. |
+| 🎨 **Theme & PWA** | Light/dark theme + accent color picker; **installable as a PWA** (manifest + service worker) to use Nexus like a native app on your phone. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -58,7 +63,9 @@ nexus_web.py      → Flask server: SSE streaming, conversation persistence, web
 nexus_ollama.py   → Optional LOCAL backend (Ollama): runs a model on your PC, $0 / no API tokens
 nexus_ninjatrader.py → NinjaTrader 8 bridge: builds/sends order files, reads prices (file AT Interface)
 nexus_tareas.py   → Productivity: tasks & reminders (due dates, priority) persisted to tareas.json
-web/index.html    → HUD front-end: streaming render, history sidebar, voice (TTS/STT)
+nexus_alertas.py  → Price alerts on NinjaTrader instruments, persisted to alertas.json
+web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
+web/manifest.webmanifest, web/sw.js → PWA manifest + service worker (installable app)
 memoria.json      → Long-term memory (git-ignored; personal)
 conversaciones.json → Web chat history (git-ignored; personal)
 ```
@@ -125,6 +132,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
 | `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
+| `NEXUS_ALERTAS_PATH` | `alertas.json` | Where price alerts are stored (git-ignored) |
 | `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
@@ -201,7 +209,13 @@ to review it. Writing the log can never interrupt or fail an order.
 Example prompts:
 - "¿A cuánto está el ES ahora mismo en NinjaTrader?"
 - "Compra 1 MNQ a mercado." *(asks you to confirm before sending)*
+- "Compra 1 ES con stop-loss en 4990 y take-profit en 5030." *(sends an OCO bracket)*
+- "Avísame si el ES toca 5000." *(creates a price alert)*
 - "Cierra mi posición en NQ" / "Aplana todo."
+
+**Bracket / OCO.** Pass `stop_loss` and/or `take_profit` to `nt_orden` and Nexus
+sends the protective orders alongside the entry, sharing an OCO id so that when one
+fills the other is cancelled.
 
 ## Tests
 
@@ -241,8 +255,13 @@ never published.
 - [x] Tasks & reminders (due dates, priority) with startup summary
 - [x] Web dashboard panel: NinjaTrader status, price watchlist, pending tasks
 - [x] Trade audit log + `nt_historial`, and crash-safe tool dispatch
-- [ ] Persist the *full* agentic tool-use blocks across reloads
-- [ ] Animated demo GIF
+- [x] Persist the *full* agentic tool-use blocks across reloads
+- [x] Animated demo GIF
+- [x] Bracket orders (OCO: stop-loss + take-profit)
+- [x] Price alerts with browser notifications
+- [x] Watchlist with % change + sparklines
+- [x] Light/dark theme + accent color
+- [x] Installable PWA (manifest + service worker)
 
 ---
 
