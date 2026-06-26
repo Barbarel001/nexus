@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NEXUS</title>
+<meta name="theme-color" content="#0a0f1a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="NEXUS" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@600;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
@@ -16,6 +22,19 @@
     --accent:#38bdf8; --accent-soft:rgba(56,189,248,.12);
     --user-bg:rgba(56,189,248,.10); --user-bd:rgba(56,189,248,.30);
     --danger:#f87171; --radius:14px;
+  }
+  /* Tema claro (se activa con data-theme="light" en <html>) */
+  :root[data-theme="light"]{
+    --bg:#eef2f7; --panel:#ffffff; --panel-2:#f5f8fc;
+    --line:rgba(15,23,42,.10); --line-2:rgba(15,23,42,.18);
+    --txt:#0f1b2d; --txt-dim:#46566b; --txt-faint:#8090a4;
+    --user-bg:rgba(56,189,248,.14);
+  }
+  /* Ajustes de legibilidad en tema claro */
+  :root[data-theme="light"] .me .body{color:#0a2535}
+  :root[data-theme="light"] .ai .body code{background:#eaf1f8;color:#0b6fa8}
+  :root[data-theme="light"] body{
+    background:radial-gradient(900px 500px at 60% -160px, rgba(56,189,248,.14), transparent 70%), var(--bg);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -156,12 +175,38 @@
   .led.off{background:var(--danger);box-shadow:0 0 8px var(--danger);animation:none}
   .nt-acct{font-size:11px;color:var(--txt-faint);margin-top:5px;font-family:'JetBrains Mono',monospace}
   .watch{display:flex;flex-direction:column;gap:5px}
+  .nt-sum{display:flex;gap:12px;margin-top:8px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--txt-faint)}
+  .nt-sum .up{color:#34d399} .nt-sum .down{color:var(--danger)}
   .wrow{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-  .wrow .sym{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--txt);font-weight:500}
-  .wrow .px{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--accent)}
+  .wrow .sym{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--txt);font-weight:500;flex:0 0 auto;min-width:62px}
+  .wrow .spark{flex:1;height:22px;min-width:30px}
+  .wrow .pxwrap{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+  .wrow .px{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--txt)}
   .wrow .px.err{color:var(--txt-faint);font-size:11px}
+  .wrow .chg{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--txt-faint)}
+  .wrow .chg.up{color:#34d399} .wrow .chg.down{color:var(--danger)}
   .wrow .rm{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:14px;opacity:0;transition:.15s;line-height:1}
   .wrow:hover .rm{opacity:.7} .wrow .rm:hover{color:var(--danger);opacity:1}
+  /* alertas */
+  .arow{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:5px}
+  .arow.hit{border-color:#fbbf24;background:rgba(251,191,36,.08)}
+  .arow .asym{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--txt)}
+  .arow .acond{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent)}
+  .arow .ast{font-size:10px;color:#fbbf24}
+  .arow .rm{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:14px;opacity:0;transition:.15s}
+  .arow:hover .rm{opacity:.7} .arow .rm:hover{color:var(--danger);opacity:1}
+  .alert-add select{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:0 6px;font-size:13px}
+  .alert-add #alPx{max-width:74px}
+  /* tabs de tareas */
+  .tabs{display:flex;gap:5px;margin-bottom:3px}
+  .tab{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--txt-faint);font-family:inherit;
+       font-size:11px;padding:5px 6px;border-radius:8px;cursor:pointer;transition:.15s}
+  .tab:hover{color:var(--txt)} .tab.active{background:var(--accent-soft);border-color:var(--user-bd);color:var(--accent)}
+  /* chips de tool-use con detalle (historial) */
+  .tool.det{cursor:pointer} .tool.det:hover{background:rgba(56,189,248,.18)}
+  .tool-pop{margin:0 0 9px;border:1px solid var(--line);border-radius:9px;background:#0b1320;padding:9px 12px;font-size:12px}
+  .tool-pop .tp{font-family:'JetBrains Mono',monospace;color:var(--txt-dim);margin:2px 0;word-break:break-word}
+  .tool-pop .tp b{color:var(--accent);font-weight:600}
   .add-row{display:flex;gap:6px}
   .add-row input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--txt);font-family:inherit;
        font-size:12.5px;padding:7px 10px;border-radius:9px;outline:none}
@@ -243,6 +288,7 @@
         <div class="card">
           <div class="nt-stat" id="ntStatus"><span class="led off"></span> …</div>
           <div class="nt-acct" id="ntAcct"></div>
+          <div class="nt-sum" id="ntSum"></div>
         </div>
         <div class="watch" id="watch"></div>
         <div class="add-row">
@@ -252,8 +298,28 @@
       </div>
 
       <div class="sect">
+        <div class="sect-h">🔔 Alertas <span class="n" id="alertasN">0</span></div>
+        <div id="alertasList"></div>
+        <div class="add-row alert-add">
+          <input id="alInst" placeholder="Instrumento" autocomplete="off" />
+          <select id="alOp"><option value=">=">≥</option><option value="<=">≤</option></select>
+          <input id="alPx" placeholder="Precio" inputmode="decimal" autocomplete="off" />
+          <button id="alAdd" title="Crear alerta">＋</button>
+        </div>
+      </div>
+
+      <div class="sect">
         <div class="sect-h">✅ Tareas <span class="n" id="tareasN">0</span></div>
+        <div class="tabs" id="tareaTabs">
+          <button class="tab active" data-f="pendientes">Pendientes</button>
+          <button class="tab" data-f="hoy">Hoy</button>
+          <button class="tab" data-f="vencidas">Vencidas</button>
+        </div>
         <div id="tareasList"></div>
+        <div class="add-row">
+          <input id="tareaInp" placeholder="Nueva tarea (añade 'hoy' o 'manana')" autocomplete="off" />
+          <button id="tareaAdd" title="Añadir tarea">＋</button>
+        </div>
       </div>
     </aside>
   </div>
@@ -278,6 +344,11 @@
       <div class="modal-sub">Se guardan en este navegador.</div>
       <label class="fld"><span>Modelo</span><select id="setModel"></select></label>
       <label class="fld"><span>¿Cómo quieres que Nexus te llame?</span><input type="text" id="setNombre" placeholder="Señor" /></label>
+      <label class="fld"><span>Tema</span><select id="setTheme">
+        <option value="dark">Oscuro</option><option value="light">Claro</option></select></label>
+      <label class="fld"><span>Color de acento</span><select id="setAccent">
+        <option value="cian">Cian</option><option value="violeta">Violeta</option>
+        <option value="verde">Verde</option><option value="ambar">Ámbar</option></select></label>
       <label class="fld row2"><input type="checkbox" id="setTts" /><span>Leer las respuestas en voz alta por defecto</span></label>
       <div class="modal-actions">
         <button class="m-btn ghost" id="setCancel">Cerrar</button>
@@ -314,7 +385,26 @@ const SET = {
   set nombre(v){ localStorage.setItem('nexus_nombre', v); },
   get tts(){ return localStorage.getItem('nexus_tts') === '1'; },
   set tts(v){ localStorage.setItem('nexus_tts', v ? '1' : '0'); },
+  get theme(){ return localStorage.getItem('nexus_theme') || 'dark'; },
+  set theme(v){ localStorage.setItem('nexus_theme', v); },
+  get accent(){ return localStorage.getItem('nexus_accent') || 'cian'; },
+  set accent(v){ localStorage.setItem('nexus_accent', v); },
 };
+
+/* ---------- Apariencia: tema + acento ---------- */
+const ACENTOS = {
+  cian:    {c:'#38bdf8', soft:'rgba(56,189,248,.12)', bd:'rgba(56,189,248,.30)'},
+  violeta: {c:'#a78bfa', soft:'rgba(167,139,250,.14)', bd:'rgba(167,139,250,.34)'},
+  verde:   {c:'#34d399', soft:'rgba(52,211,153,.14)', bd:'rgba(52,211,153,.34)'},
+  ambar:   {c:'#fbbf24', soft:'rgba(251,191,36,.14)', bd:'rgba(251,191,36,.34)'},
+};
+function aplicarApariencia(){
+  document.documentElement.setAttribute('data-theme', SET.theme);
+  const a = ACENTOS[SET.accent] || ACENTOS.cian;
+  const r = document.documentElement.style;
+  r.setProperty('--accent', a.c); r.setProperty('--accent-soft', a.soft); r.setProperty('--user-bd', a.bd);
+  const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.content = SET.theme === 'light' ? '#eef2f7' : '#0a0f1a';
+}
 
 function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
 
@@ -380,13 +470,29 @@ function adornarAI(node, getText, conRegenerar){
   node.appendChild(acts);
 }
 
-function pinta(role, text, ultimo, tools){
+function pinta(role, text, ultimo, tools, toolCalls){
   const m = document.createElement('div'); m.className = 'msg ' + (role === 'user' ? 'me' : 'ai');
   m.innerHTML = '<div class="who">' + (role === 'user' ? 'Tú' : 'Nexus') + '</div><div class="body"></div>';
   const body = m.querySelector('.body');
   if(role === 'user') body.textContent = text;
   else { try{ body.innerHTML = marked.parse(text); }catch(_){ body.textContent = text; } }
-  if(role !== 'user' && tools && tools.length){
+  if(role !== 'user' && toolCalls && toolCalls.length){
+    // Chips con detalle: al pulsarlos, despliegan entrada y resultado de la herramienta.
+    const ht = document.createElement('div'); ht.className = 'hist-tools';
+    const pop = document.createElement('div'); pop.className = 'tool-pop'; pop.style.display = 'none';
+    toolCalls.forEach(tc => {
+      const s = document.createElement('span'); s.className = 'tool det'; s.textContent = '⚙ ' + tc.name;
+      s.addEventListener('click', () => {
+        const abierto = pop.style.display !== 'none';
+        pop.innerHTML = '';
+        if(tc.detalle){ const d = document.createElement('div'); d.className = 'tp'; d.innerHTML = '<b>entrada:</b> ' + esc(tc.detalle); pop.appendChild(d); }
+        if(tc.resultado){ const r = document.createElement('div'); r.className = 'tp'; r.innerHTML = '<b>resultado:</b> ' + esc(tc.resultado); pop.appendChild(r); }
+        pop.style.display = abierto ? 'none' : 'block';
+      });
+      ht.appendChild(s);
+    });
+    m.insertBefore(ht, body); m.insertBefore(pop, body);
+  } else if(role !== 'user' && tools && tools.length){
     const ht = document.createElement('div'); ht.className = 'hist-tools';
     tools.forEach(t => { const s = document.createElement('span'); s.className = 'tool'; s.textContent = '⚙ ' + t; ht.appendChild(s); });
     m.insertBefore(ht, body);
@@ -405,7 +511,7 @@ async function abrirConv(id){
   const turnos = c.turnos || [];
   turnos.forEach((t, i) => {
     if(t.role === 'user') lastUserMsg = t.text;
-    pinta(t.role, t.text, t.role === 'assistant' && i === turnos.length - 1, t.tools);
+    pinta(t.role, t.text, t.role === 'assistant' && i === turnos.length - 1, t.tools, t.tool_calls);
   });
   renderLista(); scrollEnd(); inp.focus();
 }
@@ -568,13 +674,21 @@ document.getElementById('settings').addEventListener('click', () => {
   sel.value = SET.model;
   document.getElementById('setNombre').value = SET.nombre;
   document.getElementById('setTts').checked = SET.tts;
+  document.getElementById('setTheme').value = SET.theme;
+  document.getElementById('setAccent').value = SET.accent;
   setBg.classList.add('show');
 });
 document.getElementById('setCancel').addEventListener('click', () => setBg.classList.remove('show'));
+// Vista previa en vivo del tema/acento mientras se eligen.
+document.getElementById('setTheme').addEventListener('change', e => { SET.theme = e.target.value; aplicarApariencia(); });
+document.getElementById('setAccent').addEventListener('change', e => { SET.accent = e.target.value; aplicarApariencia(); });
 document.getElementById('setSave').addEventListener('click', () => {
   SET.model = document.getElementById('setModel').value;
   SET.nombre = document.getElementById('setNombre').value.trim();
   SET.tts = document.getElementById('setTts').checked;
+  SET.theme = document.getElementById('setTheme').value;
+  SET.accent = document.getElementById('setAccent').value;
+  aplicarApariencia();
   aplicarTts(SET.tts);
   setBg.classList.remove('show');
 });
@@ -631,12 +745,14 @@ document.getElementById('dashBtn').addEventListener('click', toggleDash);
 document.getElementById('dashClose').addEventListener('click', cerrarDash);
 document.getElementById('dashRefresh').addEventListener('click', refreshPanel);
 
-/* Estado NinjaTrader + tareas */
+/* Estado NinjaTrader + tareas + alertas */
+let tareasPend = [], tareaFiltro = 'pendientes';
 async function refreshPanel(){
   try{
     const r = await fetch('/api/panel');
-    if(r.ok){ const d = await r.json(); renderNT(d.nt); renderTareas(d.tareas || []); }
+    if(r.ok){ const d = await r.json(); renderNT(d.nt); tareasPend = d.tareas || []; renderTareas(); }
   }catch(_){ }
+  refreshAlertas();
   refreshPrecios();
 }
 function renderNT(nt){
@@ -649,11 +765,12 @@ function renderNT(nt){
     ac.textContent = 'Abre NinjaTrader y activa el AT Interface';
   }
 }
-function renderTareas(list){
+function renderTareas(){
   const cont = document.getElementById('tareasList');
-  document.getElementById('tareasN').textContent = list.length;
+  document.getElementById('tareasN').textContent = tareasPend.length;
+  const list = tareaFiltro === 'pendientes' ? tareasPend : tareasPend.filter(t => t.sev === tareaFiltro);
   cont.innerHTML = '';
-  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Nada pendiente 🎉</div>'; return; }
+  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Nada por aquí 🎉</div>'; return; }
   for(const t of list){
     const row = document.createElement('div'); row.className = 'trow';
     const due = t.etiqueta ? '<div class="due ' + esc(t.sev) + '">' + esc(t.etiqueta) + '</div>' : '';
@@ -668,33 +785,96 @@ function renderTareas(list){
     cont.appendChild(row);
   }
 }
+/* Tabs de filtro + alta de tareas */
+document.querySelectorAll('#tareaTabs .tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('#tareaTabs .tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active'); tareaFiltro = tab.dataset.f; renderTareas();
+}));
+async function addTarea(){
+  const i = document.getElementById('tareaInp'); let txt = i.value.trim();
+  if(!txt) return;
+  let vence = '';
+  const m = txt.match(/\s+(hoy|manana|mañana)$/i);
+  if(m){ vence = m[1].toLowerCase().replace('ñ','n'); txt = txt.slice(0, m.index).trim(); }
+  await fetch('/api/tarea/agregar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({texto: txt, vence: vence})});
+  i.value = ''; refreshPanel();
+}
+document.getElementById('tareaAdd').addEventListener('click', addTarea);
+document.getElementById('tareaInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addTarea(); } });
 
-/* Watchlist de precios (instrumentos en localStorage) */
+/* ---- Watchlist con variación e histórico (sparkline) ---- */
 function getWatch(){ try{ return JSON.parse(localStorage.getItem('nexus_watch') || '[]'); }catch(_){ return []; } }
 function setWatch(a){ localStorage.setItem('nexus_watch', JSON.stringify(a)); }
+function getHist(){ try{ return JSON.parse(localStorage.getItem('nexus_hist') || '{}'); }catch(_){ return {}; } }
+function setHist(h){ localStorage.setItem('nexus_hist', JSON.stringify(h)); }
+function pushHist(sym, val){
+  const h = getHist(); const a = h[sym] || []; a.push(val); if(a.length > 30) a.shift(); h[sym] = a; setHist(h);
+  return a;
+}
+function sparkline(vals){
+  if(!vals || vals.length < 2) return '';
+  const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 1;
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * 100;
+    const y = 22 - ((v - min) / rng) * 20 - 1;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const col = vals[vals.length - 1] >= vals[0] ? '#34d399' : '#f87171';
+  return '<svg class="spark" viewBox="0 0 100 22" preserveAspectRatio="none">' +
+         '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.5" ' +
+         'vector-effect="non-scaling-stroke"/></svg>';
+}
 function renderWatch(){
-  const cont = document.getElementById('watch'); const list = getWatch();
+  const cont = document.getElementById('watch'); const list = getWatch(); const hist = getHist();
   cont.innerHTML = '';
+  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Añade un instrumento ↓</div>'; }
   for(const sym of list){
     const row = document.createElement('div'); row.className = 'wrow'; row.dataset.sym = sym;
-    row.innerHTML = '<span class="sym">' + esc(sym) + '</span>' +
-                    '<span class="px">…</span>' +
+    row.innerHTML = '<span class="sym">' + esc(sym) + '</span>' + sparkline(hist[sym]) +
+                    '<span class="pxwrap"><span class="px">…</span><span class="chg"></span></span>' +
                     '<button class="rm" title="Quitar">×</button>';
-    row.querySelector('.rm').addEventListener('click', () => { setWatch(getWatch().filter(s => s !== sym)); renderWatch(); });
+    row.querySelector('.rm').addEventListener('click', () => {
+      setWatch(getWatch().filter(s => s !== sym));
+      const h = getHist(); delete h[sym]; setHist(h); renderWatch(); renderResumen();
+    });
     cont.appendChild(row);
   }
 }
 async function refreshPrecios(){
   const rows = document.querySelectorAll('#watch .wrow');
   for(const row of rows){
-    const sym = row.dataset.sym, px = row.querySelector('.px');
+    const sym = row.dataset.sym, px = row.querySelector('.px'), chg = row.querySelector('.chg');
     try{
       const r = await fetch('/api/nt/precio?instrument=' + encodeURIComponent(sym));
       const d = await r.json();
-      if(d.ok){ px.className = 'px'; px.textContent = d.precio; }
-      else { px.className = 'px err'; px.textContent = 'sin dato'; }
+      if(d.ok){
+        px.className = 'px'; px.textContent = d.precio;
+        const val = parseFloat(String(d.precio).replace(/,/g, ''));
+        if(!isNaN(val)){
+          const hist = pushHist(sym, val);
+          const base = hist[0];
+          const diff = val - base, pct = base ? (diff / base) * 100 : 0;
+          const dir = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+          chg.className = 'chg ' + dir;
+          chg.textContent = (diff >= 0 ? '▲ ' : '▼ ') + Math.abs(pct).toFixed(2) + '%';
+          row.querySelector('.spark')?.remove();
+          const sp = sparkline(hist);
+          if(sp){ row.querySelector('.sym').insertAdjacentHTML('afterend', sp); }
+        }
+      } else { px.className = 'px err'; px.textContent = 'sin dato'; chg.textContent = ''; }
     }catch(_){ px.className = 'px err'; px.textContent = '—'; }
   }
+  renderResumen();
+}
+function renderResumen(){
+  const rows = document.querySelectorAll('#watch .wrow');
+  let up = 0, down = 0;
+  rows.forEach(r => { const c = r.querySelector('.chg'); if(c?.classList.contains('up')) up++; else if(c?.classList.contains('down')) down++; });
+  const el = document.getElementById('ntSum');
+  el.innerHTML = rows.length
+    ? ('Vigilando ' + rows.length + ' · <span class="up">▲ ' + up + '</span> · <span class="down">▼ ' + down + '</span>')
+    : '';
 }
 document.getElementById('watchAdd').addEventListener('click', addWatch);
 document.getElementById('watchInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addWatch(); } });
@@ -705,6 +885,52 @@ function addWatch(){
   setWatch(list); i.value = ''; renderWatch(); refreshPrecios();
 }
 
+/* ---- Alertas de precio + notificaciones ---- */
+function notificar(titulo, cuerpo){
+  if('Notification' in window && Notification.permission === 'granted'){ try{ new Notification(titulo, {body: cuerpo}); }catch(_){ } }
+}
+async function refreshAlertas(){
+  try{
+    const r = await fetch('/api/alertas'); if(!r.ok) return;
+    const d = await r.json();
+    renderAlertas(d.alertas || []);
+    (d.disparadas || []).forEach(a => notificar('🔔 Alerta de precio',
+      a.instrument + ' ' + a.op + ' ' + a.precio + ' (actual ' + a.actual + ')'));
+  }catch(_){ }
+}
+function renderAlertas(list){
+  const cont = document.getElementById('alertasList');
+  document.getElementById('alertasN').textContent = list.length;
+  cont.innerHTML = '';
+  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Sin alertas</div>'; return; }
+  for(const a of list){
+    const row = document.createElement('div'); row.className = 'arow' + (a.disparada ? ' hit' : '');
+    row.innerHTML = '<span class="asym">' + esc(a.instrument) + '</span>' +
+                    (a.disparada ? '<span class="ast">✓ disparada</span>' : '') +
+                    '<span class="acond">' + esc(a.op + ' ' + a.precio) + '</span>' +
+                    '<button class="rm" title="Quitar">×</button>';
+    row.querySelector('.rm').addEventListener('click', async () => {
+      await fetch('/api/alerta/eliminar', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ref: a.id})});
+      refreshAlertas();
+    });
+    cont.appendChild(row);
+  }
+}
+async function addAlerta(){
+  const inst = document.getElementById('alInst').value.trim().toUpperCase();
+  const op = document.getElementById('alOp').value;
+  const px = document.getElementById('alPx').value.trim();
+  if(!inst || !px) return;
+  if('Notification' in window && Notification.permission === 'default'){ Notification.requestPermission(); }
+  await fetch('/api/alerta', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({instrument: inst, condicion: op, precio: parseFloat(px)})});
+  document.getElementById('alInst').value = ''; document.getElementById('alPx').value = '';
+  refreshAlertas();
+}
+document.getElementById('alAdd').addEventListener('click', addAlerta);
+document.getElementById('alPx').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addAlerta(); } });
+
 let panelTimer = null;
 function arrancarPanel(){
   renderWatch();
@@ -713,8 +939,14 @@ function arrancarPanel(){
   panelTimer = setInterval(() => { if(dashAbierto()) refreshPanel(); }, 20000);  // refresco periódico
 }
 
+/* ---------- PWA: service worker ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
 /* ---------- Inicio ---------- */
 (async function init(){
+  aplicarApariencia();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado

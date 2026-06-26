@@ -1,0 +1,16 @@
+{
+  "name": "NEXUS — Asistente IA",
+  "short_name": "NEXUS",
+  "description": "Tu asistente personal con IA: chat, trading (NinjaTrader), tareas y alertas de precio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
+  "lang": "es",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

@@ -174,9 +174,34 @@ def sse(event: str, data) -> str:
 
 # ---------------- Rutas ----------------
 
+WEBDIR = os.path.join(CARPETA, "web")
+
+
 @app.route("/")
 def index():
-    return send_from_directory(os.path.join(CARPETA, "web"), "index.html")
+    return send_from_directory(WEBDIR, "index.html")
+
+
+# --- PWA: manifest, service worker e iconos (servidos desde la raiz) ---
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    return send_from_directory(WEBDIR, "manifest.webmanifest", mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory(WEBDIR, "sw.js", mimetype="application/javascript")
+
+
+@app.route("/icon-192.png")
+def icon192():
+    return send_from_directory(WEBDIR, "icon-192.png")
+
+
+@app.route("/icon-512.png")
+def icon512():
+    return send_from_directory(WEBDIR, "icon-512.png")
 
 
 @app.route("/api/config")
