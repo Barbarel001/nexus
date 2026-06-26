@@ -257,3 +257,59 @@ def test_diagnostico_no_revienta(tmp_path, monkeypatch):
     monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
     rep = nt.diagnostico()
     assert "Diagnostico" in rep and "Modo simulacion" in rep
+
+
+# --------------------------- Gestion de riesgo ---------------------------
+
+def test_riesgo_cantidad_maxima(monkeypatch):
+    monkeypatch.setattr(nt, "RISK_MAX_QTY", 2)
+    assert nt.verificar_riesgo({"instrument": "ES", "action": "BUY", "qty": 5}) is not None
+    assert nt.verificar_riesgo({"instrument": "ES", "action": "BUY", "qty": 2}) is None
+
+
+def test_riesgo_instrumentos_permitidos(monkeypatch):
+    monkeypatch.setattr(nt, "RISK_INSTRUMENTOS", {"ES 12-25"})
+    assert nt.verificar_riesgo({"instrument": "AAPL", "action": "BUY", "qty": 1}) is not None
+    assert nt.verificar_riesgo({"instrument": "es 12-25", "action": "BUY", "qty": 1}) is None
+
+
+def test_riesgo_bloquea_orden(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    monkeypatch.setattr(nt, "RISK_MAX_QTY", 1)
+    out = nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 10})
+    assert "BLOQUEADA" in out
+    assert os.listdir(tmp_path) == ["t.log"]  # no se escribio ningun OIF
+
+
+def test_ordenes_hoy_cuenta(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1})
+    nt.colocar_orden({"instrument": "MNQ", "action": "SELL", "qty": 1})
+    assert nt.ordenes_hoy() == 2
+
+
+def test_riesgo_max_ordenes_dia(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    monkeypatch.setattr(nt, "RISK_MAX_ORDENES", 1)
+    assert "enviada" in nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1}).lower()
+    # la segunda del dia se bloquea
+    assert "BLOQUEADA" in nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1})
+
+
+# --------------------------- Diario de trading ---------------------------
+
+def test_diario_vacio(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    assert "vacio" in nt.diario().lower()
+
+
+def test_diario_resume(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    nt.colocar_orden({"instrument": "ES 12-25", "action": "BUY", "qty": 1})
+    nt.colocar_orden({"instrument": "MNQ", "action": "SELL", "qty": 2})
+    d = nt.diario()
+    assert "2 ordenes" in d and "BUY 1" in d and "SELL 1" in d

@@ -286,6 +286,12 @@ def panel():
     })
 
 
+@app.route("/api/diario")
+def diario_api():
+    """Diario de trading (resumen de la bitacora) para el panel."""
+    return jsonify({"texto": nt.diario()})
+
+
 @app.route("/api/nt/precio")
 def nt_precio_api():
     """Precio de un instrumento via NinjaTrader (para la watchlist del panel)."""

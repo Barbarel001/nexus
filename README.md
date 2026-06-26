@@ -139,6 +139,9 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
 | `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
 | `NEXUS_NT_SIMULAR` | `0` | `1` = **simulation mode**: simulated moving prices, orders logged locally but sent nowhere. Try the whole flow without NinjaTrader |
+| `NEXUS_RISK_MAX_QTY` | `0` | Risk rule: max quantity per order (`0` = no limit). Orders over it are blocked before sending |
+| `NEXUS_RISK_MAX_ORDENES` | `0` | Risk rule: max orders per day (`0` = no limit) |
+| `NEXUS_RISK_INSTRUMENTOS` | *(all)* | Risk rule: comma-separated allowlist of tradable instruments |
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
 | `NEXUS_ALERTAS_PATH` | `alertas.json` | Where price alerts are stored (git-ignored) |
 | `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
@@ -265,6 +268,12 @@ Example prompts:
 **Bracket / OCO.** Pass `stop_loss` and/or `take_profit` to `nt_orden` and Nexus
 sends the protective orders alongside the entry, sharing an OCO id so that when one
 fills the other is cancelled.
+
+**Risk management.** Set `NEXUS_RISK_MAX_QTY`, `NEXUS_RISK_MAX_ORDENES` and/or
+`NEXUS_RISK_INSTRUMENTOS` and every order is checked against those rules **before**
+being sent — violations are blocked and logged. **Trading journal:** `nt_diario`
+(and the 📒 button in the panel) summarizes your sent orders by action, day and the
+latest ones. Click any watchlist instrument to see a larger price chart.
 
 ## Tests
 

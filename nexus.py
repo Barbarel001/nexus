@@ -108,9 +108,10 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - web_search: para datos actuales o cosas que no sabes con certeza.
 - run_command: para ejecutar comandos en la PC (Windows / PowerShell).
 - read_file / write_file / list_directory: para trabajar con archivos.
-- nt_estado / nt_precio / nt_posicion / nt_historial: consultar NinjaTrader (conexion,
-  precios, posiciones, y la bitacora de tus ultimas operaciones).
-- nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion).
+- nt_estado / nt_precio / nt_posicion / nt_historial / nt_diario: consultar NinjaTrader
+  (conexion, precios, posiciones, bitacora y diario de trading).
+- nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion;
+  sujeto a las reglas de gestion de riesgo configuradas).
 - agregar_tarea / listar_tareas / completar_tarea / eliminar_tarea: gestionar tareas y
   recordatorios del usuario (con fecha de vencimiento y prioridad).
 - alerta_precio: crear/listar/eliminar/evaluar alertas de precio (ej. "avisame si el ES toca 5000").
@@ -504,6 +505,7 @@ EJECUTORES = {
     "nt_precio": nt.NT_EJECUTORES["nt_precio"],
     "nt_posicion": nt.NT_EJECUTORES["nt_posicion"],
     "nt_historial": nt.NT_EJECUTORES["nt_historial"],
+    "nt_diario": nt.NT_EJECUTORES["nt_diario"],
     "nt_orden": tool_nt_orden,
     "nt_cancelar": tool_nt_cancelar,
     "nt_cerrar": tool_nt_cerrar,

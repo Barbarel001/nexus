@@ -88,6 +88,12 @@ def _precio_simulado(inst: str, tipo: str = "LAST") -> str:
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 NT_LOG = _env("NEXUS_NT_LOG", os.path.join(_CARPETA, "nexus_trades.log"))
 
+# Gestion de RIESGO: reglas que se comprueban ANTES de enviar cada orden.
+# 0 / vacio = sin limite. Protegen tu cuenta de errores y excesos.
+RISK_MAX_QTY = int(_env("NEXUS_RISK_MAX_QTY", "0"))            # cantidad maxima por orden
+RISK_MAX_ORDENES = int(_env("NEXUS_RISK_MAX_ORDENES", "0"))    # maximo de ordenes por dia
+RISK_INSTRUMENTOS = {s.strip().upper() for s in _env("NEXUS_RISK_INSTRUMENTOS", "").split(",") if s.strip()}
+
 # Valores validos del protocolo OIF de NinjaTrader.
 ACCIONES = {"BUY", "SELL", "BUYTOCOVER", "SELLSHORT"}
 TIPOS_ORDEN = {"MARKET", "LIMIT", "STOPMARKET", "STOPLIMIT"}
@@ -203,6 +209,34 @@ def leer_auditoria(n: int = 15) -> list:
         return lineas[-n:]
     except FileNotFoundError:
         return []
+
+
+def ordenes_hoy() -> int:
+    """Cuenta las ordenes ENVIADAS hoy (segun la bitacora)."""
+    hoy = datetime.date.today().isoformat()
+    n = 0
+    for ln in leer_auditoria(1000):
+        partes = ln.split("\t")
+        if len(partes) >= 4 and partes[0].startswith(hoy) and partes[1] == "ORDEN" and "enviada" in partes[3]:
+            n += 1
+    return n
+
+
+def verificar_riesgo(args: dict):
+    """Comprueba las reglas de riesgo. Devuelve None si la orden es aceptable, o un
+    texto explicando por que se rechaza."""
+    inst = _campo(args.get("instrument")).upper()
+    try:
+        qty = int(float(args.get("qty")))
+    except (TypeError, ValueError):
+        qty = 0
+    if RISK_MAX_QTY and qty > RISK_MAX_QTY:
+        return f"la cantidad {qty} supera el maximo por orden ({RISK_MAX_QTY})"
+    if RISK_INSTRUMENTOS and inst not in RISK_INSTRUMENTOS:
+        return f"{inst} no esta en tu lista de instrumentos permitidos"
+    if RISK_MAX_ORDENES and ordenes_hoy() >= RISK_MAX_ORDENES:
+        return f"alcanzaste el limite de {RISK_MAX_ORDENES} ordenes por dia"
+    return None
 
 
 def enviar_comando(linea: str, carpeta: str = None) -> str:
@@ -371,6 +405,34 @@ def posicion(args: dict) -> str:
         return f"No pude leer la posicion: {e}"
 
 
+def diario(args: dict = None) -> str:
+    """Diario de trading: resume las operaciones de la bitacora (cuantas, por accion,
+    por instrumento y por dia). No es P&L realizado (eso requiere los fills de NT)."""
+    lineas = leer_auditoria(2000)
+    ordenes = []
+    for ln in lineas:
+        p = ln.split("\t")
+        if len(p) >= 4 and p[1] == "ORDEN" and "enviada" in p[3]:
+            fecha = p[0][:10]
+            detalle = p[2]  # ej. "BUY 1 ES 12-25 MARKET ..."
+            accion = detalle.split(" ")[0] if detalle else "?"
+            ordenes.append({"fecha": fecha, "accion": accion, "detalle": detalle})
+    if not ordenes:
+        return "Tu diario esta vacio: aun no hay ordenes enviadas registradas."
+    por_accion, por_dia = {}, {}
+    for o in ordenes:
+        por_accion[o["accion"]] = por_accion.get(o["accion"], 0) + 1
+        por_dia[o["fecha"]] = por_dia.get(o["fecha"], 0) + 1
+    out = [f"📒 Diario de trading — {len(ordenes)} ordenes registradas"]
+    out.append("Por accion: " + ", ".join(f"{k} {v}" for k, v in sorted(por_accion.items())))
+    out.append("Por dia: " + ", ".join(f"{k}: {v}" for k, v in sorted(por_dia.items())[-7:]))
+    out.append("Ultimas:")
+    for o in ordenes[-5:]:
+        out.append(f"  • {o['fecha']}  {o['detalle']}")
+    out.append("(Nota: cuenta ordenes enviadas, no P&L realizado.)")
+    return "\n".join(out)
+
+
 def historial(args: dict = None) -> str:
     """Muestra las ultimas operaciones registradas en la bitacora de auditoria."""
     args = args or {}
@@ -393,6 +455,11 @@ def colocar_orden(args: dict) -> str:
     qty = args.get("qty")
     stop_loss = _campo(args.get("stop_loss"))
     take_profit = _campo(args.get("take_profit"))
+    # Gestion de riesgo: se comprueba ANTES de construir/enviar nada.
+    riesgo = verificar_riesgo(args)
+    if riesgo:
+        auditar("ORDEN", resumen_orden(args), f"BLOQUEADA (riesgo): {riesgo}")
+        return f"Orden BLOQUEADA por gestion de riesgo: {riesgo}."
     try:
         entrada = construir_place(
             account=cuenta, instrument=args.get("instrument"),
@@ -502,6 +569,12 @@ NT_TOOLS = [
         },
     },
     {
+        "name": "nt_diario",
+        "description": ("Diario de trading: resumen de las ordenes enviadas (cuantas, por accion, "
+                        "por dia y ultimas). Util para repasar tu actividad."),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
         "name": "nt_historial",
         "description": ("Muestra las ultimas operaciones que Nexus ha enviado a NinjaTrader "
                         "(bitacora de auditoria). Opcional 'n' = cuantas mostrar."),
@@ -564,7 +637,7 @@ NT_TOOLS = [
 # Herramientas de orden (mueven dinero): necesitan confirmacion / off por defecto en web.
 NT_PELIGROSAS = {"nt_orden", "nt_cancelar", "nt_cerrar"}
 # Herramientas de solo lectura (seguras).
-NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion", "nt_historial"}
+NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion", "nt_historial", "nt_diario"}
 
 # Mapa nombre -> funcion de trabajo (sin confirmacion).
 NT_EJECUTORES = {
@@ -572,6 +645,7 @@ NT_EJECUTORES = {
     "nt_precio": precio,
     "nt_posicion": posicion,
     "nt_historial": historial,
+    "nt_diario": diario,
     "nt_orden": colocar_orden,
     "nt_cancelar": cancelar,
     "nt_cerrar": cerrar,

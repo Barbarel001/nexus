@@ -170,6 +170,9 @@
   .sect{display:flex;flex-direction:column;gap:9px}
   .sect-h{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-faint);display:flex;align-items:center;gap:7px}
   .sect-h .n{margin-left:auto;background:var(--accent-soft);color:var(--accent);font-size:10px;padding:1px 7px;border-radius:10px}
+  .sect-h .mini{margin-left:auto;background:none;border:1px solid var(--line);color:var(--txt-dim);font-size:12px;cursor:pointer;border-radius:7px;padding:1px 7px}
+  .sect-h .mini:hover{color:var(--txt);border-color:var(--line-2)}
+  .wrow .sym,.wrow .spark{cursor:pointer}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-size:13px}
   .nt-stat{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt-dim)}
   .led.off{background:var(--danger);box-shadow:0 0 8px var(--danger);animation:none}
@@ -284,7 +287,7 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">📈 NinjaTrader</div>
+        <div class="sect-h">📈 NinjaTrader <button class="mini" id="diarioBtn" title="Diario de trading">📒</button></div>
         <div class="card">
           <div class="nt-stat" id="ntStatus"><span class="led off"></span> …</div>
           <div class="nt-acct" id="ntAcct"></div>
@@ -334,6 +337,24 @@
         <button class="m-btn ghost" id="confirmNo">Denegar</button>
         <button class="m-btn danger" id="confirmYes">Aprobar y ejecutar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: info (diario de trading, etc.) -->
+  <div class="modal-bg" id="infoBg">
+    <div class="modal">
+      <div class="modal-h" id="infoTitle">Info</div>
+      <pre class="modal-pre" id="infoBody"></pre>
+      <div class="modal-actions"><button class="m-btn ghost" id="infoClose">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- Modal: gráfico de instrumento -->
+  <div class="modal-bg" id="chartBg">
+    <div class="modal">
+      <div class="modal-h" id="chartTitle">Gráfico</div>
+      <div id="chartBox" style="padding:6px 0 14px"></div>
+      <div class="modal-actions"><button class="m-btn ghost" id="chartClose">Cerrar</button></div>
     </div>
   </div>
 
@@ -838,9 +859,46 @@ function renderWatch(){
       setWatch(getWatch().filter(s => s !== sym));
       const h = getHist(); delete h[sym]; setHist(h); renderWatch(); renderResumen();
     });
+    row.querySelector('.sym').addEventListener('click', () => abrirChart(sym));
     cont.appendChild(row);
   }
 }
+
+/* Gráfico ampliado de un instrumento (desde el histórico guardado) */
+function chartSVG(vals, w, h){
+  if(!vals || vals.length < 2) return '<div class="dash-empty">Aún no hay suficientes datos. Espera unos refrescos.</div>';
+  const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 1;
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = h - ((v - min) / rng) * (h - 10) - 5;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const col = vals[vals.length - 1] >= vals[0] ? '#34d399' : '#f87171';
+  return '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="background:#0b1320;border-radius:10px">' +
+         '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>' +
+         '<div style="display:flex;justify-content:space-between;font-family:monospace;font-size:11px;color:var(--txt-faint);margin-top:6px">' +
+         '<span>min ' + min + '</span><span>últ ' + vals[vals.length-1] + '</span><span>max ' + max + '</span></div>';
+}
+const chartBg = document.getElementById('chartBg');
+function abrirChart(sym){
+  document.getElementById('chartTitle').textContent = '📈 ' + sym;
+  document.getElementById('chartBox').innerHTML = chartSVG(getHist()[sym], 420, 180);
+  chartBg.classList.add('show');
+}
+document.getElementById('chartClose').addEventListener('click', () => chartBg.classList.remove('show'));
+
+/* Diario de trading */
+const infoBg = document.getElementById('infoBg');
+document.getElementById('infoClose').addEventListener('click', () => infoBg.classList.remove('show'));
+document.getElementById('diarioBtn').addEventListener('click', async () => {
+  document.getElementById('infoTitle').textContent = '📒 Diario de trading';
+  document.getElementById('infoBody').textContent = 'Cargando…';
+  infoBg.classList.add('show');
+  try{
+    const r = await fetch('/api/diario'); const d = await r.json();
+    document.getElementById('infoBody').textContent = d.texto || '(sin datos)';
+  }catch(_){ document.getElementById('infoBody').textContent = 'No se pudo cargar el diario.'; }
+});
 async function refreshPrecios(){
   const rows = document.querySelectorAll('#watch .wrow');
   for(const row of rows){
