@@ -33,6 +33,8 @@ try:
 except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
+import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
+
 
 # ============================================================
 #  CONFIGURACION  (cambia estas variables a tu gusto)
@@ -104,6 +106,8 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - web_search: para datos actuales o cosas que no sabes con certeza.
 - run_command: para ejecutar comandos en la PC (Windows / PowerShell).
 - read_file / write_file / list_directory: para trabajar con archivos.
+- nt_estado / nt_precio / nt_posicion: consultar NinjaTrader (conexion, precios, posiciones).
+- nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion).
 
 Contexto del usuario:
 - Sabe programar (Python) y quiere conseguir ingresos como freelance de bots
@@ -117,6 +121,9 @@ Reglas:
 - Se conciso. Al terminar, resume en una linea lo que hiciste.
 - Si algo es destructivo o arriesgado, avisalo claramente antes de hacerlo.
 - Si no estas seguro de un dato reciente, buscalo en la web en vez de inventarlo.
+- TRADING: las ordenes de NinjaTrader mueven DINERO REAL. Antes de enviar una,
+  confirma el instrumento, accion, cantidad y tipo; nunca operes sin que el usuario
+  lo pida de forma explicita, y resume claramente lo que vas a hacer.
 """
 
 
@@ -261,6 +268,15 @@ TOOLS = [
     # tool calling" (p. ej. Haiku), ademas de seguir funcionando en Opus/Sonnet.
     {"type": "web_search_20260209", "name": "web_search", "allowed_callers": ["direct"]},
 ]
+
+# Herramientas de NinjaTrader (trading). Se anaden al set general.
+TOOLS += nt.NT_TOOLS
+
+# Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero o tocan el
+# sistema): piden confirmacion en la terminal y van detras del modal en la web,
+# donde ademas estan desactivadas por defecto. La web y el backend Ollama leen
+# este set para no tener que repetir la lista.
+HERRAMIENTAS_PELIGROSAS = {"run_command", "write_file"} | nt.NT_PELIGROSAS
 
 
 # ============================================================
@@ -446,6 +462,28 @@ def tool_list_directory(args: dict) -> str:
         return f"Error al listar '{path}': {e}"
 
 
+def tool_nt_orden(args: dict) -> str:
+    if not _confirmar(f"Nexus quiere ENVIAR esta ORDEN REAL a NinjaTrader:\n    {nt.resumen_orden(args)}"):
+        return "El usuario denego la orden."
+    return nt.colocar_orden(args)
+
+
+def tool_nt_cancelar(args: dict) -> str:
+    que = "TODAS las ordenes" if (args.get("todas") or args.get("order_id") in (None, "", "todas")) \
+        else f"la orden {args.get('order_id')}"
+    if not _confirmar(f"Nexus quiere CANCELAR {que} en NinjaTrader"):
+        return "El usuario denego la cancelacion."
+    return nt.cancelar(args)
+
+
+def tool_nt_cerrar(args: dict) -> str:
+    que = "APLANAR TODO (cerrar posiciones y cancelar ordenes)" if (args.get("todo") or not args.get("instrument")) \
+        else f"cerrar la posicion de {args.get('instrument')}"
+    if not _confirmar(f"Nexus quiere {que} en NinjaTrader"):
+        return "El usuario denego el cierre."
+    return nt.cerrar(args)
+
+
 EJECUTORES = {
     "recordar": tool_recordar,
     "rastrear_ofertas": tool_rastrear_ofertas,
@@ -453,6 +491,13 @@ EJECUTORES = {
     "read_file": tool_read_file,
     "write_file": tool_write_file,
     "list_directory": tool_list_directory,
+    # NinjaTrader: lectura directa; las ordenes pasan por confirmacion (wrappers).
+    "nt_estado": nt.NT_EJECUTORES["nt_estado"],
+    "nt_precio": nt.NT_EJECUTORES["nt_precio"],
+    "nt_posicion": nt.NT_EJECUTORES["nt_posicion"],
+    "nt_orden": tool_nt_orden,
+    "nt_cancelar": tool_nt_cancelar,
+    "nt_cerrar": tool_nt_cerrar,
 }
 
 

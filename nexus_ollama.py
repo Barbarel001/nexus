@@ -56,7 +56,7 @@ def tools_ollama(incluir_peligrosas: bool = False) -> list:
         if str(t.get("type", "")).startswith("web_search"):
             continue
         name = t.get("name")
-        if not incluir_peligrosas and name in ("run_command", "write_file"):
+        if not incluir_peligrosas and name in nexus.HERRAMIENTAS_PELIGROSAS:
             continue
         out.append({
             "type": "function",

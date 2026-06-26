@@ -1,0 +1,155 @@
+# -*- coding: utf-8 -*-
+"""Tests del puente con NinjaTrader. No necesitan NinjaTrader instalado:
+se valida el formato OIF (funciones puras) y el envio/lectura con carpetas temp."""
+
+import os
+
+import pytest
+
+import nexus
+import nexus_ninjatrader as nt
+
+
+# --------------------------- Construccion de comandos OIF ---------------------------
+
+def test_construir_place_market():
+    linea = nt.construir_place("Sim101", "AAPL", "buy", 2, "market")
+    campos = linea.split(";")
+    assert campos[0] == "PLACE"
+    assert campos[1] == "Sim101"
+    assert campos[2] == "AAPL"          # instrumento en mayuscula
+    assert campos[3] == "BUY"           # accion normalizada
+    assert campos[4] == "2"             # cantidad entera
+    assert campos[5] == "MARKET"
+    assert len(campos) == 13            # PLACE + 12 campos
+
+
+def test_construir_place_limit_incluye_precio():
+    linea = nt.construir_place("Sim101", "ES 12-25", "SELL", 1, "LIMIT", limit_price="5000.25")
+    campos = linea.split(";")
+    assert campos[5] == "LIMIT"
+    assert campos[6] == "5000.25"
+
+
+def test_construir_place_accion_invalida():
+    with pytest.raises(ValueError):
+        nt.construir_place("Sim101", "AAPL", "comprar", 1)  # 'comprar' no es valida
+
+
+def test_construir_place_cantidad_invalida():
+    with pytest.raises(ValueError):
+        nt.construir_place("Sim101", "AAPL", "BUY", 0)
+    with pytest.raises(ValueError):
+        nt.construir_place("Sim101", "AAPL", "BUY", -3)
+
+
+def test_construir_place_limit_sin_precio_falla():
+    with pytest.raises(ValueError):
+        nt.construir_place("Sim101", "AAPL", "BUY", 1, "LIMIT")  # falta limit_price
+
+
+def test_construir_place_stop_sin_precio_falla():
+    with pytest.raises(ValueError):
+        nt.construir_place("Sim101", "AAPL", "BUY", 1, "STOPMARKET")  # falta stop_price
+
+
+def test_construir_cancel():
+    assert nt.construir_cancel("abc123").split(";")[:2] == ["CANCEL", "abc123"]
+
+
+def test_construir_cancel_vacio_falla():
+    with pytest.raises(ValueError):
+        nt.construir_cancel("")
+
+
+def test_construir_close_y_flatten():
+    assert nt.construir_close("Sim101", "AAPL").startswith("CLOSEPOSITION;Sim101;AAPL")
+    assert nt.construir_cancel_all() == "CANCELALLORDERS"
+    assert nt.construir_flatten() == "FLATTENEVERYTHING"
+
+
+# --------------------------- Envio de comandos (carpeta temporal) ---------------------------
+
+def test_enviar_comando_escribe_archivo(tmp_path):
+    ruta = nt.enviar_comando("PLACE;Sim101;AAPL;BUY;1;MARKET;;;DAY;;;;", str(tmp_path))
+    assert os.path.isfile(ruta)
+    assert ruta.endswith(".txt") and "oif_nexus_" in os.path.basename(ruta)
+    with open(ruta, encoding="utf-8") as f:
+        assert f.read().strip().startswith("PLACE;Sim101;AAPL;BUY;1;MARKET")
+
+
+def test_enviar_comando_carpeta_inexistente(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        nt.enviar_comando("CANCELALLORDERS", str(tmp_path / "no_existe"))
+
+
+# --------------------------- Lectura de precio (archivo simulado) ---------------------------
+
+def test_leer_precio_lee_archivo(tmp_path):
+    # Simulamos el archivo que NinjaTrader escribiria tras un SUBSCRIBE.
+    (tmp_path / "AAPL_LAST.txt").write_text("231.05", encoding="utf-8")
+    valor = nt.leer_precio("AAPL", "LAST", carpeta=str(tmp_path), espera=0.5)
+    assert valor == "231.05"
+
+
+def test_leer_precio_tipo_invalido(tmp_path):
+    with pytest.raises(ValueError):
+        nt.leer_precio("AAPL", "XYZ", carpeta=str(tmp_path), espera=0)
+
+
+def test_leer_precio_sin_archivo(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        nt.leer_precio("AAPL", "LAST", carpeta=str(tmp_path), espera=0)
+
+
+# --------------------------- Funciones de alto nivel ---------------------------
+
+def test_colocar_orden_invalida_no_revienta(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    out = nt.colocar_orden({"instrument": "AAPL", "action": "nope", "qty": 1})
+    assert "rechazada" in out.lower()
+
+
+def test_colocar_orden_ok(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    out = nt.colocar_orden({"instrument": "AAPL", "action": "BUY", "qty": 2})
+    assert "enviada" in out.lower()
+    # se escribio un OIF en la carpeta
+    assert any(p.startswith("oif_nexus_") for p in os.listdir(tmp_path))
+
+
+def test_resumen_orden_legible():
+    r = nt.resumen_orden({"instrument": "es 12-25", "action": "buy", "qty": 1, "order_type": "market"})
+    assert "BUY" in r and "ES 12-25" in r and "MARKET" in r
+
+
+def test_estado_carpeta_inexistente(monkeypatch, tmp_path):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path / "nope"))
+    assert "NO encuentro" in nt.estado()
+
+
+# --------------------------- Integracion con el registro de Nexus ---------------------------
+
+def test_nt_tools_registradas_en_nexus():
+    nombres = {t.get("name") for t in nexus.TOOLS}
+    assert {"nt_estado", "nt_precio", "nt_posicion", "nt_orden", "nt_cancelar", "nt_cerrar"} <= nombres
+
+
+def test_nt_ejecutores_registrados():
+    for n in ("nt_estado", "nt_precio", "nt_posicion", "nt_orden", "nt_cancelar", "nt_cerrar"):
+        assert n in nexus.EJECUTORES
+
+
+def test_ordenes_son_peligrosas():
+    assert nt.NT_PELIGROSAS <= nexus.HERRAMIENTAS_PELIGROSAS
+    # las de lectura NO son peligrosas
+    assert not (nt.NT_SEGURAS & nexus.HERRAMIENTAS_PELIGROSAS)
+
+
+def test_orden_requiere_confirmacion(monkeypatch, tmp_path):
+    """En la terminal, una orden denegada en la confirmacion no se envia."""
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nexus, "_confirmar", lambda *_: False)
+    out = nexus.EJECUTORES["nt_orden"]({"instrument": "AAPL", "action": "BUY", "qty": 1})
+    assert "denego" in out.lower()
+    assert os.listdir(tmp_path) == []  # no se escribio ninguna orden
