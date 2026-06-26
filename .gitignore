@@ -5,6 +5,7 @@ tareas.json
 alertas.json
 nexus_trades.log
 *.log
+nexus_nt_sim/
 
 # Variables de entorno / secretos
 .env

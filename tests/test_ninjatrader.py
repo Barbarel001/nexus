@@ -226,3 +226,34 @@ def test_resumen_orden_incluye_oco():
     r = nt.resumen_orden({"instrument": "ES", "action": "BUY", "qty": 1,
                           "stop_loss": "4990", "take_profit": "5030"})
     assert "stop-loss 4990" in r and "take-profit 5030" in r
+
+
+# --------------------------- Modo simulacion ---------------------------
+
+def test_modo_simulacion_precio_y_estado(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path / "sim"))
+    # carpeta_ok crea la carpeta y devuelve True aunque no exista al inicio
+    assert nt.carpeta_ok() is True
+    # precio simulado: numero parseable, cercano a la base de ES
+    val = float(nt.leer_precio("ES 12-25", "LAST", espera=0))
+    assert 4900 < val < 5100
+    assert "SIMULACION" in nt.estado()
+
+
+def test_simulacion_orden_se_guarda_local(tmp_path, monkeypatch):
+    sim = tmp_path / "sim"
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(sim))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    out = nt.colocar_orden({"instrument": "MNQ", "action": "BUY", "qty": 1})
+    assert "enviada" in out.lower()
+    assert any(p.startswith("oif_nexus_") for p in os.listdir(sim))  # quedó local
+
+
+def test_diagnostico_no_revienta(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path / "sim"))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    rep = nt.diagnostico()
+    assert "Diagnostico" in rep and "Modo simulacion" in rep

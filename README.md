@@ -131,6 +131,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NT_FOLDER` | *(auto)* | NinjaTrader 8 `incoming` folder (auto-detected under `Documents/NinjaTrader 8/incoming`) |
 | `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
 | `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
+| `NEXUS_NT_SIMULAR` | `0` | `1` = **simulation mode**: simulated moving prices, orders logged locally but sent nowhere. Try the whole flow without NinjaTrader |
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
 | `NEXUS_ALERTAS_PATH` | `alertas.json` | Where price alerts are stored (git-ignored) |
 | `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
@@ -176,7 +177,22 @@ Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface
 no extra libraries, no broker API keys. Nexus drops *Order Instruction Files* in
 NinjaTrader's `incoming` folder and reads the price files NinjaTrader writes back.
 
-**Setup (one time):**
+**Try it first without NinjaTrader (simulation mode):**
+
+```bash
+# Windows
+set NEXUS_NT_SIMULAR=1 && python nexus_web.py
+# macOS / Linux
+NEXUS_NT_SIMULAR=1 python nexus_web.py
+```
+Prices move on their own, alerts trigger, and orders are logged locally (sent
+nowhere). Perfect for a safe first test of the whole flow. Run a quick setup check
+any time with:
+```bash
+python nexus_ninjatrader.py     # prints a diagnostic report
+```
+
+**Setup for real trading (one time):**
 
 1. In NinjaTrader 8: `Tools → Options → Automated trading interface` → enable **AT Interface**.
 2. (Optional) point Nexus at your real account:

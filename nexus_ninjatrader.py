@@ -30,6 +30,7 @@ DINERO REAL: revisa siempre el resumen antes de aprobar.
 import os
 import glob
 import time
+import math
 import uuid
 import datetime
 
@@ -49,6 +50,38 @@ def _carpeta_incoming_por_defecto() -> str:
 NT_FOLDER = _env("NEXUS_NT_FOLDER", _carpeta_incoming_por_defecto())
 NT_ACCOUNT = _env("NEXUS_NT_ACCOUNT", "Sim101")   # 'Sim101' = simulacion (seguro por defecto)
 NT_ESPERA = float(_env("NEXUS_NT_ESPERA", "2.5"))  # espera maxima por el archivo de precio
+
+# MODO SIMULACION (NEXUS_NT_SIMULAR=1): para PROBAR todo el flujo sin NinjaTrader
+# y sin riesgo. Los precios se generan localmente (se mueven, para ver sparklines y
+# disparar alertas) y las ordenes se escriben en una carpeta local pero NO llegan a
+# ningun broker (nadie las lee). Ideal para una primera prueba de extremo a extremo.
+NT_SIMULAR = _env("NEXUS_NT_SIMULAR", "0").lower() in ("1", "true", "yes", "on", "si")
+if NT_SIMULAR and not os.environ.get("NEXUS_NT_FOLDER"):
+    NT_FOLDER = os.path.join(_carpeta := os.path.dirname(os.path.abspath(__file__)), "nexus_nt_sim")
+
+# Precios base (estables) por instrumento para el modo simulacion.
+_SIM_BASE = {"ES 12-25": 5012, "MES 12-25": 5012, "ES": 5012, "MES": 5012,
+             "NQ 12-25": 21855, "MNQ": 21840, "NQ": 21855,
+             "AAPL": 231, "MSFT": 430, "TSLA": 250, "BTC": 64000}
+
+
+def _base_sim(inst: str) -> float:
+    inst = (inst or "").upper()
+    if inst in _SIM_BASE:
+        return float(_SIM_BASE[inst])
+    return 50.0 + (sum(ord(c) for c in inst) * 7) % 4000  # base plausible y estable
+
+
+def _precio_simulado(inst: str, tipo: str = "LAST") -> str:
+    """Precio simulado que oscila suavemente con el tiempo (para ver movimiento)."""
+    base = _base_sim(inst)
+    osc = math.sin(time.time() / 6.0 + len(inst)) * base * 0.0015  # +-0.15%
+    val = base + osc
+    if tipo == "BID":
+        val -= base * 0.0001
+    elif tipo == "ASK":
+        val += base * 0.0001
+    return f"{val:.2f}"
 
 # Bitacora de auditoria: TODA orden/cancelacion/cierre que Nexus envia queda
 # registrada aqui con fecha y hora. Es clave operando con dinero real.
@@ -143,7 +176,11 @@ def construir_flatten() -> str:
 # ============================================================
 
 def carpeta_ok(carpeta: str = None) -> bool:
-    return os.path.isdir(carpeta or NT_FOLDER)
+    carpeta = carpeta or NT_FOLDER
+    if NT_SIMULAR:
+        os.makedirs(carpeta, exist_ok=True)  # en simulacion siempre "conectado"
+        return True
+    return os.path.isdir(carpeta)
 
 
 def auditar(accion: str, detalle: str, resultado: str = "enviado") -> None:
@@ -174,6 +211,8 @@ def enviar_comando(linea: str, carpeta: str = None) -> str:
 
     NO pide confirmacion: eso lo hace quien llama (terminal/web)."""
     carpeta = carpeta or NT_FOLDER
+    if NT_SIMULAR:
+        os.makedirs(carpeta, exist_ok=True)  # en simulacion la carpeta se crea sola
     if not os.path.isdir(carpeta):
         raise FileNotFoundError(
             f"No encuentro la carpeta de NinjaTrader: {carpeta}\n"
@@ -213,6 +252,9 @@ def leer_precio(instrument: str, tipo: str = "LAST", carpeta: str = None,
         raise ValueError("Falta el instrumento.")
     if tipo not in TIPOS_PRECIO:
         raise ValueError(f"Tipo de precio invalido: '{tipo}'. Usa {sorted(TIPOS_PRECIO)}.")
+
+    if NT_SIMULAR:
+        return _precio_simulado(instrument, tipo)  # precio local, sin NinjaTrader
 
     # Pedimos la suscripcion a datos de mercado (NinjaTrader empieza a escribir el archivo).
     enviar_comando(f"SUBSCRIBE;{instrument}", carpeta)
@@ -300,6 +342,10 @@ def resumen_orden(args: dict) -> str:
 
 def estado() -> str:
     carpeta = NT_FOLDER
+    if NT_SIMULAR:
+        return (f"NinjaTrader: MODO SIMULACION activo (NEXUS_NT_SIMULAR=1).\n"
+                f"Precios simulados y ordenes guardadas en {carpeta} (no llegan a ningun broker). "
+                "Ideal para probar sin riesgo. Desactivalo para operar de verdad.")
     if carpeta_ok(carpeta):
         return (f"NinjaTrader: carpeta detectada en {carpeta}.\n"
                 f"Cuenta por defecto: {NT_ACCOUNT}. Listo para operar.")
@@ -530,3 +576,39 @@ NT_EJECUTORES = {
     "nt_cancelar": cancelar,
     "nt_cerrar": cerrar,
 }
+
+
+# ============================================================
+#  DIAGNOSTICO  (correr:  python nexus_ninjatrader.py)
+# ============================================================
+
+def diagnostico() -> str:
+    """Comprueba la configuracion del puente y devuelve un informe legible. Util para
+    verificar el setup de NinjaTrader antes de operar (o ver el modo simulacion)."""
+    lineas = ["=== Diagnostico del puente NinjaTrader ==="]
+    lineas.append(f"Modo simulacion : {'SI (NEXUS_NT_SIMULAR=1)' if NT_SIMULAR else 'no'}")
+    lineas.append(f"Carpeta         : {NT_FOLDER}")
+    lineas.append(f"  existe?       : {'si' if os.path.isdir(NT_FOLDER) else 'NO'}")
+    lineas.append(f"Cuenta          : {NT_ACCOUNT}")
+    lineas.append(f"Bitacora        : {NT_LOG}")
+    # Prueba de escritura de una orden de PRUEBA (no es una orden real de mercado)
+    try:
+        ruta = enviar_comando("SUBSCRIBE;TEST", NT_FOLDER)
+        lineas.append(f"Escritura OIF   : OK ({os.path.basename(ruta)})")
+        try:
+            os.remove(ruta)
+        except OSError:
+            pass
+    except Exception as e:
+        lineas.append(f"Escritura OIF   : FALLO -> {e}")
+    # Prueba de lectura de precio
+    try:
+        val = leer_precio("ES 12-25", "LAST", espera=1.0)
+        lineas.append(f"Lectura precio  : OK (ES 12-25 = {val})")
+    except Exception as e:
+        lineas.append(f"Lectura precio  : sin dato -> {e}")
+    return "\n".join(lineas)
+
+
+if __name__ == "__main__":
+    print(diagnostico())
