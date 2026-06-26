@@ -22,6 +22,7 @@ import json
 import uuid
 import datetime
 
+import nexus_util
 import nexus_ninjatrader as nt
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -39,8 +40,7 @@ def cargar() -> list:
 
 
 def guardar(alertas: list) -> None:
-    with open(ALERTAS_PATH, "w", encoding="utf-8") as f:
-        json.dump({"alertas": alertas}, f, ensure_ascii=False, indent=2)
+    nexus_util.guardar_json(ALERTAS_PATH, {"alertas": alertas})
 
 
 # --------------------------- Normalizacion ---------------------------

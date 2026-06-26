@@ -39,6 +39,7 @@ except ImportError:
     sys.exit("Falta 'flask'. Ejecuta: pip install flask")
 
 import anthropic
+import nexus_util  # escritura atomica / logging
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
@@ -159,8 +160,7 @@ def cargar_convs() -> dict:
 
 
 def guardar_convs(data: dict) -> None:
-    with open(CONV_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    nexus_util.guardar_json(CONV_PATH, data)
 
 
 def buscar_conv(data: dict, cid: str):
@@ -629,8 +629,10 @@ def _arrancar_proactivo():
             threading.Thread(target=nexus_telegram.run, daemon=True, name="nexus-telegram").start()
             nexus_scheduler.iniciar_en_hilo()
             print("  [Telegram + scheduler proactivo activos]")
+            nexus_util.log("Modo proactivo iniciado (Telegram + scheduler)")
     except Exception as e:
         print(f"  (no se pudo iniciar el modo proactivo: {e})")
+        nexus_util.log(f"Fallo al iniciar modo proactivo: {e}", "ERROR")
 
 
 if __name__ == "__main__":

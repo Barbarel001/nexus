@@ -70,6 +70,8 @@ nexus_alertas.py  → Price alerts on NinjaTrader instruments, persisted to aler
 nexus_telegram.py → Telegram bot: control Nexus + notifications from anywhere (no tunnel)
 nexus_scheduler.py → Proactive jobs: alert watch + morning briefing (push via Telegram)
 nexus_docs.py     → Docs/RAG-lite: keyword search over your .txt/.md/.pdf files
+nexus_util.py     → Base utils: atomic JSON writes (crash-safe), tolerant reads, logging
+nexus_servicio.bat → "Always-on" launcher (auto-restart; add to Windows startup)
 web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
 web/manifest.webmanifest, web/sw.js → PWA manifest + service worker (installable app)
 memoria.json      → Long-term memory (git-ignored; personal)
@@ -173,6 +175,15 @@ setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
 
 In local mode **no API key is required** and every turn costs **$0**. Tool-use and
 streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
+
+## Always-on (run Nexus as a background service)
+
+For proactive features (morning briefing, alert push) Nexus needs to keep running.
+On Windows, edit **`nexus_servicio.bat`** (set your env vars) and run it — it
+auto-restarts Nexus if it crashes. To start it with Windows, press `Win+R`, type
+`shell:startup`, and drop a shortcut to the .bat there. All data is saved with
+**atomic writes** (temp file + replace) so a crash mid-save never corrupts your
+files, and key events go to `nexus.log`.
 
 ## Telegram bot + proactive mode
 
@@ -323,6 +334,13 @@ never published.
 - [x] Watchlist with % change + sparklines
 - [x] Light/dark theme + accent color
 - [x] Installable PWA (manifest + service worker)
+- [x] Telegram bot + proactive scheduler (alerts + morning briefing)
+- [x] Optional password login + remote access (LAN / public tunnel)
+- [x] Risk rules, trading journal, price charts; bracket OCO
+- [x] Advanced memory (categories/search/forget) + docs RAG-lite
+- [x] Tags, projects and recurring tasks
+- [x] Crash-safe atomic writes, logging, and an always-on launcher
+- [x] NinjaTrader simulation mode + diagnostic CLI
 
 ---
 

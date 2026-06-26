@@ -34,6 +34,7 @@ try:
 except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
+import nexus_util  # utilidades base (escritura atomica, logging)
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
 import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
@@ -170,8 +171,7 @@ def cargar_memoria() -> list:
 
 
 def _guardar_notas(notas: list) -> None:
-    with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
-        json.dump({"notas": notas}, f, ensure_ascii=False, indent=2)
+    nexus_util.guardar_json(MEMORIA_PATH, {"notas": notas})
 
 
 def guardar_nota(nota: str, categoria: str = "general") -> bool:

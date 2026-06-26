@@ -21,6 +21,8 @@ import json
 import uuid
 import datetime
 
+import nexus_util
+
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 TAREAS_PATH = os.environ.get("NEXUS_TAREAS_PATH") or os.path.join(CARPETA, "tareas.json")
 
@@ -39,8 +41,7 @@ def cargar() -> list:
 
 
 def guardar(tareas: list) -> None:
-    with open(TAREAS_PATH, "w", encoding="utf-8") as f:
-        json.dump({"tareas": tareas}, f, ensure_ascii=False, indent=2)
+    nexus_util.guardar_json(TAREAS_PATH, {"tareas": tareas})
 
 
 def _hoy() -> datetime.date:
