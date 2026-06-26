@@ -44,6 +44,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
 | ✅ **In-browser confirmation** | Optional web system actions (run commands / write files) gated behind an explicit approval modal. |
 | 🆓 **Local model (free)** | Optional **Ollama** backend: runs a model on your own machine (Qwen2.5 / Llama 3.1) with tool-use + streaming, **$0 — no API tokens**. Pick it from ⚙ Settings. |
+| 📈 **NinjaTrader bridge** | Trade from Nexus via NinjaTrader 8's file-based **AT Interface** (no extra deps): check status, read prices, read positions, **place / cancel / close orders** — every order gated behind explicit confirmation. |
 | 🖥️ **Terminal client** | Full agent with the complete tool set, **streaming** responses and an iteration safety cap per turn. |
 | 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools unless explicitly opted in. |
 
@@ -53,6 +54,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 nexus.py          → Terminal agent: agentic loop + tool dispatch + adaptive thinking
 nexus_web.py      → Flask server: SSE streaming, conversation persistence, web-safe tools
 nexus_ollama.py   → Optional LOCAL backend (Ollama): runs a model on your PC, $0 / no API tokens
+nexus_ninjatrader.py → NinjaTrader 8 bridge: builds/sends order files, reads prices (file AT Interface)
 web/index.html    → HUD front-end: streaming render, history sidebar, voice (TTS/STT)
 memoria.json      → Long-term memory (git-ignored; personal)
 conversaciones.json → Web chat history (git-ignored; personal)
@@ -116,6 +118,9 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
 | `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `NEXUS_NT_FOLDER` | *(auto)* | NinjaTrader 8 `incoming` folder (auto-detected under `Documents/NinjaTrader 8/incoming`) |
+| `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
+| `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
@@ -136,6 +141,41 @@ setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
 
 In local mode **no API key is required** and every turn costs **$0**. Tool-use and
 streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
+
+## NinjaTrader (trading from Nexus)
+
+Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —
+no extra libraries, no broker API keys. Nexus drops *Order Instruction Files* in
+NinjaTrader's `incoming` folder and reads the price files NinjaTrader writes back.
+
+**Setup (one time):**
+
+1. In NinjaTrader 8: `Tools → Options → Automated trading interface` → enable **AT Interface**.
+2. (Optional) point Nexus at your real account:
+   ```bash
+   setx NEXUS_NT_ACCOUNT "MyRealAccountName"   # default is Sim101 (simulation)
+   ```
+
+**Tools the agent can use:**
+
+| Tool | What it does | Safety |
+|---|---|---|
+| `nt_estado` | Check the bridge / connection and default account | read-only |
+| `nt_precio` | Last / bid / ask price for an instrument | read-only |
+| `nt_posicion` | Current open position for an instrument | read-only |
+| `nt_orden` | **Place** an order (market / limit / stop) | ⚠️ confirmation required |
+| `nt_cancelar` | Cancel one order (or all) | ⚠️ confirmation required |
+| `nt_cerrar` | Close a position (or flatten everything) | ⚠️ confirmation required |
+
+> **Real money.** Every order goes through the same confirmation gate as `run_command`:
+> in the terminal you approve it inline; in the web UI it's blocked unless
+> `NEXUS_WEB_ACCIONES=1` and then each order needs explicit approval in the modal.
+> The default account is `Sim101` (simulation) until you change it — **test in sim first.**
+
+Example prompts:
+- "¿A cuánto está el ES ahora mismo en NinjaTrader?"
+- "Compra 1 MNQ a mercado." *(asks you to confirm before sending)*
+- "Cierra mi posición en NQ" / "Aplana todo."
 
 ## Tests
 
@@ -171,6 +211,7 @@ never published.
 - [x] Streaming responses in the terminal client
 - [x] Tool-use chips shown when reopening a conversation
 - [x] Local model backend (Ollama) — $0, no API tokens
+- [x] NinjaTrader 8 bridge (file AT Interface): prices, positions, place/cancel/close orders
 - [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 

@@ -39,14 +39,17 @@ except ImportError:
 import anthropic
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
+import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
 
-# Herramientas de solo-lectura, siempre disponibles en la web.
-SEGURAS = {"recordar", "rastrear_ofertas", "read_file", "list_directory"}
-# Herramientas que tocan el sistema: solo si NEXUS_WEB_ACCIONES=1, y con confirmacion.
-PELIGROSAS = {"run_command", "write_file"}
+# Herramientas de solo-lectura, siempre disponibles en la web (incluye lectura
+# de NinjaTrader: estado, precio y posicion -- no mueven dinero).
+SEGURAS = {"recordar", "rastrear_ofertas", "read_file", "list_directory"} | nt.NT_SEGURAS
+# Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
+# confirmacion. Fuente unica compartida con la terminal (nexus.py).
+PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
 
 WEB_ACCIONES = nexus._env("NEXUS_WEB_ACCIONES", "0").lower() in ("1", "true", "yes", "on")
 
@@ -115,11 +118,13 @@ def ejecutar_web(name: str, args: dict) -> str:
 
 
 def ejecutar_peligrosa(name: str, args: dict) -> str:
-    """Ejecuta una accion de sistema YA APROBADA por el usuario (modal)."""
+    """Ejecuta una accion peligrosa YA APROBADA por el usuario (modal)."""
     if name == "run_command":
         return nexus.ejecutar_powershell(args.get("command", ""))
     if name == "write_file":
         return nexus.escribir_archivo(args.get("path", ""), args.get("content", ""))
+    if name in nt.NT_PELIGROSAS:  # ordenes de NinjaTrader (ya aprobadas en el modal)
+        return nt.NT_EJECUTORES[name](args)
     return f"Herramienta desconocida: {name}"
 
 
@@ -129,6 +134,14 @@ def resumen_accion(name: str, args: dict) -> str:
     if name == "write_file":
         n = len(args.get("content", "") or "")
         return f"Escribir archivo: {args.get('path', '')}   ({n} caracteres)"
+    if name == "nt_orden":
+        return f"Orden NinjaTrader: {nt.resumen_orden(args)}"
+    if name == "nt_cancelar":
+        return "Cancelar TODAS las ordenes" if (args.get("todas") or not args.get("order_id")) \
+            else f"Cancelar orden {args.get('order_id')}"
+    if name == "nt_cerrar":
+        return "Aplanar TODO en NinjaTrader" if (args.get("todo") or not args.get("instrument")) \
+            else f"Cerrar posicion {args.get('instrument')}"
     return name
 
 
