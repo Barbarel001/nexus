@@ -41,6 +41,7 @@ import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
 import nexus_tareas as tareas  # productividad (tareas/recordatorios)
+import nexus_alertas as alertas  # alertas de precio
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -48,7 +49,7 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 # Herramientas seguras, siempre disponibles en la web: lectura general, lectura de
 # NinjaTrader (estado/precio/posicion, no mueven dinero) y productividad (tareas).
 SEGURAS = ({"recordar", "rastrear_ofertas", "read_file", "list_directory"}
-           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS)
+           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -147,6 +148,21 @@ def resumen_accion(name: str, args: dict) -> str:
     return name
 
 
+def detalle_tool(name: str, args: dict) -> str:
+    """Resumen corto y legible de la ENTRADA de una herramienta (para persistir y
+    mostrar los bloques de tool-use al recargar)."""
+    especifico = resumen_accion(name, args)
+    if especifico != name:
+        return especifico
+    # Generico: muestra los argumentos no vacios, recortados.
+    partes = []
+    for k, v in (args or {}).items():
+        v = str(v)
+        if v:
+            partes.append(f"{k}={v[:60]}")
+    return ", ".join(partes)[:200]
+
+
 def modelo_pedido() -> str:
     m = (request.args.get("model") or "").strip()
     return m if m in MODELOS_OK else nexus.MODEL
@@ -203,6 +219,46 @@ def completar_tarea_api():
         return jsonify({"ok": False, "error": "falta ref"}), 400
     msg = tareas.completar(ref)
     return jsonify({"ok": "completada" in msg.lower(), "msg": msg})
+
+
+@app.route("/api/tarea/agregar", methods=["POST"])
+def agregar_tarea_api():
+    """Crea una tarea desde el panel."""
+    body = request.get_json(silent=True) or {}
+    try:
+        t = tareas.agregar(body.get("texto", ""), body.get("vence", ""), body.get("prioridad", "media"))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "tarea": tareas.dto(t)})
+
+
+@app.route("/api/alertas")
+def alertas_api():
+    """Lista las alertas y, de paso, las evalua: las que se disparan se devuelven en
+    'disparadas' para que el navegador notifique."""
+    disparadas = alertas.evaluar()
+    return jsonify({"alertas": [alertas.dto(a) for a in alertas.cargar()],
+                    "disparadas": disparadas})
+
+
+@app.route("/api/alerta", methods=["POST"])
+def crear_alerta_api():
+    body = request.get_json(silent=True) or {}
+    try:
+        a = alertas.agregar(body.get("instrument", ""), body.get("condicion", ">="), body.get("precio"))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "alerta": alertas.dto(a)})
+
+
+@app.route("/api/alerta/eliminar", methods=["POST"])
+def eliminar_alerta_api():
+    body = request.get_json(silent=True) or {}
+    ref = (body.get("ref") or "").strip()
+    if not ref:
+        return jsonify({"ok": False, "error": "falta ref"}), 400
+    msg = alertas.eliminar(ref)
+    return jsonify({"ok": "eliminada" in msg.lower(), "msg": msg})
 
 
 @app.route("/api/conversaciones")
@@ -299,6 +355,7 @@ def stream():
         texto_final = ""
         tin = tout = 0
         tools_usados = []
+        tool_calls = []  # bloques completos: {name, detalle, resultado} para persistir
 
         # ---- Backend LOCAL (Ollama): coste 0, sin tokens de la API ----
         if usar_ollama:
@@ -388,16 +445,19 @@ def stream():
                             "tool_use_id": b.id,
                             "content": salida,
                         })
+                        tool_calls.append({"name": b.name, "detalle": detalle_tool(b.name, b.input),
+                                           "resultado": str(salida)[:500]})
                     api_messages.append({"role": "user", "content": resultados})
                     continue
                 break
         except Exception as e:
             yield sse("error", {"msg": str(e)})
 
-        # Persistimos el turno (texto simple, suficiente para mostrar y continuar).
+        # Persistimos el turno (texto + bloques de tool-use, para re-renderizar al recargar).
         conv["turnos"].append({"role": "user", "text": msg})
         conv["turnos"].append({"role": "assistant", "text": texto_final,
-                               "tools": list(dict.fromkeys(tools_usados))})
+                               "tools": list(dict.fromkeys(tools_usados)),
+                               "tool_calls": tool_calls})
         guardar_convs(data)
 
         if tin or tout:

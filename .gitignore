@@ -2,6 +2,7 @@
 memoria.json
 conversaciones.json
 tareas.json
+alertas.json
 nexus_trades.log
 *.log
 

@@ -30,6 +30,7 @@ DINERO REAL: revisa siempre el resumen antes de aprobar.
 import os
 import glob
 import time
+import uuid
 import datetime
 
 # --- Configuracion (por entorno; defaults seguros) ------------------------
@@ -180,7 +181,9 @@ def enviar_comando(linea: str, carpeta: str = None) -> str:
             "activado (Tools -> Options -> Automated trading interface), o define "
             "NEXUS_NT_FOLDER con la ruta correcta de tu carpeta 'incoming'."
         )
-    nombre = f"oif_nexus_{int(time.time() * 1000)}.txt"
+    # Nombre unico incluso si se envian varias ordenes en el mismo milisegundo
+    # (p. ej. un bracket OCO): el sufijo aleatorio evita colisiones/sobrescrituras.
+    nombre = f"oif_nexus_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}.txt"
     ruta = os.path.join(carpeta, nombre)
     with open(ruta, "w", encoding="utf-8") as f:
         f.write(linea + "\n")
@@ -267,6 +270,14 @@ def leer_posicion(instrument: str, account: str = None, carpeta: str = None) -> 
 #  FUNCIONES DE ALTO NIVEL  (las que llaman las herramientas)
 # ============================================================
 
+_OPUESTA = {"BUY": "SELL", "SELL": "BUY", "SELLSHORT": "BUYTOCOVER", "BUYTOCOVER": "SELLSHORT"}
+
+
+def accion_opuesta(accion: str) -> str:
+    """Accion que CIERRA una posicion abierta con `accion` (para stop/objetivo)."""
+    return _OPUESTA.get((accion or "").upper(), "SELL")
+
+
 def resumen_orden(args: dict) -> str:
     """Texto legible de una orden, para mostrar en la confirmacion."""
     cuenta = _campo(args.get("account")) or NT_ACCOUNT
@@ -279,6 +290,10 @@ def resumen_orden(args: dict) -> str:
         extra.append(f"limite {args.get('limit_price')}")
     if _campo(args.get("stop_price")):
         extra.append(f"stop {args.get('stop_price')}")
+    if _campo(args.get("stop_loss")):
+        extra.append(f"stop-loss {args.get('stop_loss')}")
+    if _campo(args.get("take_profit")):
+        extra.append(f"take-profit {args.get('take_profit')}")
     cola = f" ({', '.join(extra)})" if extra else ""
     return f"{accion} {qty} {inst} {tipo}{cola}  [cuenta {cuenta}]"
 
@@ -325,25 +340,50 @@ def historial(args: dict = None) -> str:
 
 
 def colocar_orden(args: dict) -> str:
-    """Construye y envia una orden PLACE. NO confirma (lo hace quien llama)."""
+    """Construye y envia una orden PLACE. Si se indican stop_loss y/o take_profit,
+    envia ademas las ordenes de proteccion como un OCO (al ejecutarse una, la otra
+    se cancela). NO confirma (lo hace quien llama)."""
+    cuenta = _campo(args.get("account")) or NT_ACCOUNT
+    qty = args.get("qty")
+    stop_loss = _campo(args.get("stop_loss"))
+    take_profit = _campo(args.get("take_profit"))
     try:
-        linea = construir_place(
-            account=args.get("account"), instrument=args.get("instrument"),
-            action=args.get("action"), qty=args.get("qty"),
+        entrada = construir_place(
+            account=cuenta, instrument=args.get("instrument"),
+            action=args.get("action"), qty=qty,
             order_type=args.get("order_type", "MARKET"),
             limit_price=args.get("limit_price", ""), stop_price=args.get("stop_price", ""),
             tif=args.get("tif", "DAY"), oco_id=args.get("oco_id", ""),
             order_id=args.get("order_id", ""),
         )
+        # Ordenes de proteccion (cierran la posicion): accion opuesta, mismo OCO.
+        protecciones = []
+        if stop_loss or take_profit:
+            inst = _campo(args.get("instrument"))
+            opuesta = accion_opuesta(args.get("action"))
+            oco = f"nexus_oco_{int(time.time() * 1000)}"
+            if take_profit:
+                protecciones.append(construir_place(
+                    account=cuenta, instrument=inst, action=opuesta, qty=qty,
+                    order_type="LIMIT", limit_price=take_profit, tif="GTC", oco_id=oco))
+            if stop_loss:
+                protecciones.append(construir_place(
+                    account=cuenta, instrument=inst, action=opuesta, qty=qty,
+                    order_type="STOPMARKET", stop_price=stop_loss, tif="GTC", oco_id=oco))
     except ValueError as e:
         return f"Orden rechazada: {e}"
     try:
-        enviar_comando(linea)
+        enviar_comando(entrada)
+        for linea in protecciones:
+            enviar_comando(linea)
     except Exception as e:
         auditar("ORDEN", resumen_orden(args), f"ERROR: {e}")
         return f"No pude enviar la orden a NinjaTrader: {e}"
     auditar("ORDEN", resumen_orden(args), "enviada")
-    return f"Orden enviada a NinjaTrader: {resumen_orden(args)}"
+    cola = ""
+    if protecciones:
+        cola = f" + proteccion OCO ({len(protecciones)} ordenes)"
+    return f"Orden enviada a NinjaTrader: {resumen_orden(args)}{cola}"
 
 
 def cancelar(args: dict) -> str:
@@ -439,6 +479,8 @@ NT_TOOLS = [
                 "order_type": {"type": "string", "description": "MARKET (defecto), LIMIT, STOPMARKET o STOPLIMIT."},
                 "limit_price": {"type": "string", "description": "Precio limite (para LIMIT/STOPLIMIT)."},
                 "stop_price": {"type": "string", "description": "Precio stop (para STOPMARKET/STOPLIMIT)."},
+                "stop_loss": {"type": "string", "description": "Opcional: precio de stop-loss de proteccion (crea un OCO)."},
+                "take_profit": {"type": "string", "description": "Opcional: precio de take-profit (crea un OCO)."},
                 "tif": {"type": "string", "description": "DAY (defecto) o GTC."},
                 "account": {"type": "string", "description": "Cuenta (opcional; usa la de por defecto)."},
             },

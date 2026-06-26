@@ -194,3 +194,35 @@ def test_ejecutar_herramienta_captura_excepciones(monkeypatch):
     monkeypatch.setitem(nexus.EJECUTORES, "nt_estado", explota)
     out = nexus.ejecutar_herramienta("nt_estado", {})
     assert "Error ejecutando" in out and "boom" in out  # no se propaga la excepcion
+
+
+# --------------------------- OCO: stop-loss / take-profit ---------------------------
+
+def test_accion_opuesta():
+    assert nt.accion_opuesta("BUY") == "SELL"
+    assert nt.accion_opuesta("SELL") == "BUY"
+    assert nt.accion_opuesta("SELLSHORT") == "BUYTOCOVER"
+
+
+def test_orden_con_oco_envia_tres_ordenes(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    out = nt.colocar_orden({"instrument": "ES 12-25", "action": "BUY", "qty": 1,
+                            "stop_loss": "4990", "take_profit": "5030"})
+    assert "OCO" in out
+    archivos = [p for p in os.listdir(tmp_path) if p.startswith("oif_nexus_")]
+    assert len(archivos) == 3  # entrada + stop + objetivo
+    # Las protecciones usan la accion opuesta (SELL) y comparten un OCO id
+    contenidos = []
+    for p in sorted(archivos):
+        with open(os.path.join(tmp_path, p), encoding="utf-8") as f:
+            contenidos.append(f.read())
+    todo = "".join(contenidos)
+    assert "nexus_oco_" in todo
+    assert todo.count("SELL") >= 2  # stop y objetivo cierran un BUY
+
+
+def test_resumen_orden_incluye_oco():
+    r = nt.resumen_orden({"instrument": "ES", "action": "BUY", "qty": 1,
+                          "stop_loss": "4990", "take_profit": "5030"})
+    assert "stop-loss 4990" in r and "take-profit 5030" in r

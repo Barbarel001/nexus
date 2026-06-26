@@ -35,6 +35,7 @@ except ImportError:
 
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
 import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
+import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
 
 
 # ============================================================
@@ -112,6 +113,7 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion).
 - agregar_tarea / listar_tareas / completar_tarea / eliminar_tarea: gestionar tareas y
   recordatorios del usuario (con fecha de vencimiento y prioridad).
+- alerta_precio: crear/listar/eliminar/evaluar alertas de precio (ej. "avisame si el ES toca 5000").
 
 Contexto del usuario:
 - Sabe programar (Python) y quiere conseguir ingresos como freelance de bots
@@ -273,9 +275,10 @@ TOOLS = [
     {"type": "web_search_20260209", "name": "web_search", "allowed_callers": ["direct"]},
 ]
 
-# Herramientas de NinjaTrader (trading) y de productividad. Se anaden al set general.
+# Herramientas de NinjaTrader (trading), productividad y alertas. Se anaden al set general.
 TOOLS += nt.NT_TOOLS
 TOOLS += tareas.TAREAS_TOOLS
+TOOLS += alertas.ALERTAS_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero o tocan el
 # sistema): piden confirmacion en la terminal y van detras del modal en la web,
@@ -505,8 +508,9 @@ EJECUTORES = {
     "nt_cancelar": tool_nt_cancelar,
     "nt_cerrar": tool_nt_cerrar,
 }
-# Productividad (tareas/recordatorios): herramientas seguras.
+# Productividad (tareas/recordatorios) y alertas de precio: herramientas seguras.
 EJECUTORES.update(tareas.TAREAS_EJECUTORES)
+EJECUTORES.update(alertas.ALERTAS_EJECUTORES)
 
 
 def ejecutar_herramienta(name: str, args: dict) -> str:
