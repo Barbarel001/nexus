@@ -504,12 +504,17 @@ def main():
         sys.exit('Falta ANTHROPIC_API_KEY. Configurala con:  setx ANTHROPIC_API_KEY "sk-ant-..."')
     import webbrowser
     port = int(nexus._env("NEXUS_PORT", "5000"))
+    # Por seguridad escucha solo en 127.0.0.1 (solo esta PC). Para abrir Nexus desde
+    # el movil en tu red local (misma WiFi), arranca con NEXUS_HOST=0.0.0.0 y entra
+    # desde el telefono a http://<IP-de-tu-PC>:5000  (averigua la IP con 'ipconfig').
+    host = nexus._env("NEXUS_HOST", "127.0.0.1")
     url = f"http://127.0.0.1:{port}"
     if nexus._env("NEXUS_OPEN", "1").lower() not in ("0", "false", "no"):
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     extra = "  [acciones de sistema ON]" if WEB_ACCIONES else ""
-    print(f"NEXUS web encendido en {url}{extra}   (Ctrl+C para detener)")
-    app.run(host="127.0.0.1", port=port, threaded=True)
+    red = "  [accesible en tu red local]" if host not in ("127.0.0.1", "localhost") else ""
+    print(f"NEXUS web encendido en {url}{extra}{red}   (Ctrl+C para detener)")
+    app.run(host=host, port=port, threaded=True)
 
 
 if __name__ == "__main__":

@@ -125,6 +125,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_CONFIRMAR` | `1` | `0` runs terminal commands without asking (⚠️ use with care) |
 | `NEXUS_WEB_ACCIONES` | `0` | `1` enables system actions in the web UI (always behind the confirmation modal) |
 | `NEXUS_PORT` | `5000` | Web server port |
+| `NEXUS_HOST` | `127.0.0.1` | Bind address. `0.0.0.0` exposes Nexus on your local network so you can open it from your phone (same Wi-Fi) at `http://<your-PC-IP>:5000` |
 | `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
 | `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
