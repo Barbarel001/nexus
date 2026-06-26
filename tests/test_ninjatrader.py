@@ -153,3 +153,44 @@ def test_orden_requiere_confirmacion(monkeypatch, tmp_path):
     out = nexus.EJECUTORES["nt_orden"]({"instrument": "AAPL", "action": "BUY", "qty": 1})
     assert "denego" in out.lower()
     assert os.listdir(tmp_path) == []  # no se escribio ninguna orden
+
+
+# --------------------------- Bitacora de auditoria ---------------------------
+
+def test_orden_se_registra_en_bitacora(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "trades.log"))
+    nt.colocar_orden({"instrument": "MNQ", "action": "BUY", "qty": 1})
+    lineas = nt.leer_auditoria()
+    assert len(lineas) == 1
+    assert "ORDEN" in lineas[0] and "MNQ" in lineas[0] and "enviada" in lineas[0]
+
+
+def test_auditar_nunca_lanza(monkeypatch):
+    # Aunque la ruta sea invalida, auditar() no debe lanzar.
+    monkeypatch.setattr(nt, "NT_LOG", "/ruta/que/no/existe/y/no/se/puede/crear.log")
+    nt.auditar("ORDEN", "x")  # no debe lanzar
+
+
+def test_historial_vacio_y_lleno(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "trades.log"))
+    assert "Aun no hay" in nt.historial({})
+    nt.auditar("CANCELAR", "todas", "enviada")
+    out = nt.historial({"n": 5})
+    assert "CANCELAR" in out
+
+
+def test_historial_registrado_en_nexus():
+    assert "nt_historial" in nexus.EJECUTORES
+    assert "nt_historial" in nt.NT_SEGURAS
+    assert "nt_historial" not in nexus.HERRAMIENTAS_PELIGROSAS
+
+
+# --------------------------- Robustez del despacho de herramientas ---------------------------
+
+def test_ejecutar_herramienta_captura_excepciones(monkeypatch):
+    def explota(_):
+        raise RuntimeError("boom")
+    monkeypatch.setitem(nexus.EJECUTORES, "nt_estado", explota)
+    out = nexus.ejecutar_herramienta("nt_estado", {})
+    assert "Error ejecutando" in out and "boom" in out  # no se propaga la excepcion

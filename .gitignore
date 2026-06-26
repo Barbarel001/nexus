@@ -2,6 +2,8 @@
 memoria.json
 conversaciones.json
 tareas.json
+nexus_trades.log
+*.log
 
 # Variables de entorno / secretos
 .env

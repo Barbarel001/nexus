@@ -30,6 +30,7 @@ DINERO REAL: revisa siempre el resumen antes de aprobar.
 import os
 import glob
 import time
+import datetime
 
 # --- Configuracion (por entorno; defaults seguros) ------------------------
 
@@ -47,6 +48,11 @@ def _carpeta_incoming_por_defecto() -> str:
 NT_FOLDER = _env("NEXUS_NT_FOLDER", _carpeta_incoming_por_defecto())
 NT_ACCOUNT = _env("NEXUS_NT_ACCOUNT", "Sim101")   # 'Sim101' = simulacion (seguro por defecto)
 NT_ESPERA = float(_env("NEXUS_NT_ESPERA", "2.5"))  # espera maxima por el archivo de precio
+
+# Bitacora de auditoria: TODA orden/cancelacion/cierre que Nexus envia queda
+# registrada aqui con fecha y hora. Es clave operando con dinero real.
+_CARPETA = os.path.dirname(os.path.abspath(__file__))
+NT_LOG = _env("NEXUS_NT_LOG", os.path.join(_CARPETA, "nexus_trades.log"))
 
 # Valores validos del protocolo OIF de NinjaTrader.
 ACCIONES = {"BUY", "SELL", "BUYTOCOVER", "SELLSHORT"}
@@ -137,6 +143,28 @@ def construir_flatten() -> str:
 
 def carpeta_ok(carpeta: str = None) -> bool:
     return os.path.isdir(carpeta or NT_FOLDER)
+
+
+def auditar(accion: str, detalle: str, resultado: str = "enviado") -> None:
+    """Anade una linea a la bitacora de operaciones. NUNCA lanza: el registro no
+    debe poder interrumpir una operacion. Formato TSV: fecha, accion, detalle, resultado."""
+    try:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        detalle = (detalle or "").replace("\t", " ").replace("\n", " ")
+        with open(NT_LOG, "a", encoding="utf-8") as f:
+            f.write(f"{ts}\t{accion}\t{detalle}\t{resultado}\n")
+    except OSError:
+        pass
+
+
+def leer_auditoria(n: int = 15) -> list:
+    """Devuelve las ultimas n lineas de la bitacora (mas recientes al final)."""
+    try:
+        with open(NT_LOG, "r", encoding="utf-8", errors="replace") as f:
+            lineas = [ln.rstrip("\n") for ln in f if ln.strip()]
+        return lineas[-n:]
+    except FileNotFoundError:
+        return []
 
 
 def enviar_comando(linea: str, carpeta: str = None) -> str:
@@ -282,6 +310,20 @@ def posicion(args: dict) -> str:
         return f"No pude leer la posicion: {e}"
 
 
+def historial(args: dict = None) -> str:
+    """Muestra las ultimas operaciones registradas en la bitacora de auditoria."""
+    args = args or {}
+    try:
+        n = int(args.get("n", 15))
+    except (TypeError, ValueError):
+        n = 15
+    n = max(1, min(n, 100))
+    lineas = leer_auditoria(n)
+    if not lineas:
+        return "Aun no hay operaciones registradas en la bitacora."
+    return "Ultimas operaciones (fecha | accion | detalle | resultado):\n" + "\n".join(lineas)
+
+
 def colocar_orden(args: dict) -> str:
     """Construye y envia una orden PLACE. NO confirma (lo hace quien llama)."""
     try:
@@ -298,7 +340,9 @@ def colocar_orden(args: dict) -> str:
     try:
         enviar_comando(linea)
     except Exception as e:
+        auditar("ORDEN", resumen_orden(args), f"ERROR: {e}")
         return f"No pude enviar la orden a NinjaTrader: {e}"
+    auditar("ORDEN", resumen_orden(args), "enviada")
     return f"Orden enviada a NinjaTrader: {resumen_orden(args)}"
 
 
@@ -306,13 +350,14 @@ def cancelar(args: dict) -> str:
     """Cancela una orden por id, o TODAS si se pide 'todas'."""
     try:
         if str(args.get("todas", "")).lower() in ("1", "true", "si", "yes") or args.get("order_id") in (None, "", "todas"):
-            linea = construir_cancel_all()
-            enviar_comando(linea)
+            enviar_comando(construir_cancel_all())
+            auditar("CANCELAR", "todas", "enviada")
             return "Solicitud enviada: cancelar TODAS las ordenes."
-        linea = construir_cancel(args.get("order_id"))
-        enviar_comando(linea)
+        enviar_comando(construir_cancel(args.get("order_id")))
+        auditar("CANCELAR", str(args.get("order_id")), "enviada")
         return f"Solicitud enviada: cancelar la orden {args.get('order_id')}."
     except Exception as e:
+        auditar("CANCELAR", str(args.get("order_id") or "todas"), f"ERROR: {e}")
         return f"No pude cancelar: {e}"
 
 
@@ -321,11 +366,14 @@ def cerrar(args: dict) -> str:
     try:
         if str(args.get("todo", "")).lower() in ("1", "true", "si", "yes") or not _campo(args.get("instrument")):
             enviar_comando(construir_flatten())
+            auditar("CERRAR", "aplanar todo", "enviada")
             return "Solicitud enviada: APLANAR todo (cerrar posiciones y cancelar ordenes)."
-        linea = construir_close(args.get("account"), args.get("instrument"))
-        enviar_comando(linea)
-        return f"Solicitud enviada: cerrar la posicion de {_campo(args.get('instrument')).upper()}."
+        inst = _campo(args.get("instrument")).upper()
+        enviar_comando(construir_close(args.get("account"), args.get("instrument")))
+        auditar("CERRAR", inst, "enviada")
+        return f"Solicitud enviada: cerrar la posicion de {inst}."
     except Exception as e:
+        auditar("CERRAR", _campo(args.get("instrument")).upper() or "todo", f"ERROR: {e}")
         return f"No pude cerrar la posicion: {e}"
 
 
@@ -365,6 +413,16 @@ NT_TOOLS = [
                 "account": {"type": "string", "description": "Cuenta (opcional; usa la de por defecto)."},
             },
             "required": ["instrument"],
+        },
+    },
+    {
+        "name": "nt_historial",
+        "description": ("Muestra las ultimas operaciones que Nexus ha enviado a NinjaTrader "
+                        "(bitacora de auditoria). Opcional 'n' = cuantas mostrar."),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "description": "Cuantas operaciones mostrar (defecto 15)."}},
+            "required": [],
         },
     },
     {
@@ -418,13 +476,14 @@ NT_TOOLS = [
 # Herramientas de orden (mueven dinero): necesitan confirmacion / off por defecto en web.
 NT_PELIGROSAS = {"nt_orden", "nt_cancelar", "nt_cerrar"}
 # Herramientas de solo lectura (seguras).
-NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion"}
+NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion", "nt_historial"}
 
 # Mapa nombre -> funcion de trabajo (sin confirmacion).
 NT_EJECUTORES = {
     "nt_estado": lambda a: estado(),
     "nt_precio": precio,
     "nt_posicion": posicion,
+    "nt_historial": historial,
     "nt_orden": colocar_orden,
     "nt_cancelar": cancelar,
     "nt_cerrar": cerrar,

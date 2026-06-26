@@ -125,6 +125,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NT_ACCOUNT` | `Sim101` | Default NinjaTrader account. **Defaults to the simulation account**; set your real account name to trade live |
 | `NEXUS_NT_ESPERA` | `2.5` | Seconds to wait for NinjaTrader to write a price file |
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
+| `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 
@@ -182,6 +183,7 @@ NinjaTrader's `incoming` folder and reads the price files NinjaTrader writes bac
 | `nt_estado` | Check the bridge / connection and default account | read-only |
 | `nt_precio` | Last / bid / ask price for an instrument | read-only |
 | `nt_posicion` | Current open position for an instrument | read-only |
+| `nt_historial` | Recent orders Nexus has sent (audit log) | read-only |
 | `nt_orden` | **Place** an order (market / limit / stop) | ⚠️ confirmation required |
 | `nt_cancelar` | Cancel one order (or all) | ⚠️ confirmation required |
 | `nt_cerrar` | Close a position (or flatten everything) | ⚠️ confirmation required |
@@ -190,6 +192,11 @@ NinjaTrader's `incoming` folder and reads the price files NinjaTrader writes bac
 > in the terminal you approve it inline; in the web UI it's blocked unless
 > `NEXUS_WEB_ACCIONES=1` and then each order needs explicit approval in the modal.
 > The default account is `Sim101` (simulation) until you change it — **test in sim first.**
+
+**Audit trail.** Every order / cancel / close Nexus sends is appended to
+`nexus_trades.log` (git-ignored) with a timestamp and outcome — a permanent record
+of what was traded and when. Ask *"muéstrame mis últimas operaciones"* (`nt_historial`)
+to review it. Writing the log can never interrupt or fail an order.
 
 Example prompts:
 - "¿A cuánto está el ES ahora mismo en NinjaTrader?"
@@ -233,6 +240,7 @@ never published.
 - [x] NinjaTrader 8 bridge (file AT Interface): prices, positions, place/cancel/close orders
 - [x] Tasks & reminders (due dates, priority) with startup summary
 - [x] Web dashboard panel: NinjaTrader status, price watchlist, pending tasks
+- [x] Trade audit log + `nt_historial`, and crash-safe tool dispatch
 - [ ] Persist the *full* agentic tool-use blocks across reloads
 - [ ] Animated demo GIF
 

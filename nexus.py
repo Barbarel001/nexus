@@ -107,7 +107,8 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - web_search: para datos actuales o cosas que no sabes con certeza.
 - run_command: para ejecutar comandos en la PC (Windows / PowerShell).
 - read_file / write_file / list_directory: para trabajar con archivos.
-- nt_estado / nt_precio / nt_posicion: consultar NinjaTrader (conexion, precios, posiciones).
+- nt_estado / nt_precio / nt_posicion / nt_historial: consultar NinjaTrader (conexion,
+  precios, posiciones, y la bitacora de tus ultimas operaciones).
 - nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion).
 - agregar_tarea / listar_tareas / completar_tarea / eliminar_tarea: gestionar tareas y
   recordatorios del usuario (con fecha de vencimiento y prioridad).
@@ -499,6 +500,7 @@ EJECUTORES = {
     "nt_estado": nt.NT_EJECUTORES["nt_estado"],
     "nt_precio": nt.NT_EJECUTORES["nt_precio"],
     "nt_posicion": nt.NT_EJECUTORES["nt_posicion"],
+    "nt_historial": nt.NT_EJECUTORES["nt_historial"],
     "nt_orden": tool_nt_orden,
     "nt_cancelar": tool_nt_cancelar,
     "nt_cerrar": tool_nt_cerrar,
@@ -511,7 +513,12 @@ def ejecutar_herramienta(name: str, args: dict) -> str:
     funcion = EJECUTORES.get(name)
     if funcion is None:
         return f"Herramienta desconocida: {name}"
-    return funcion(args)
+    try:
+        return funcion(args)
+    except Exception as e:
+        # Una herramienta que falla NUNCA debe tumbar el turno del agente: devolvemos
+        # el error como resultado para que el modelo pueda reaccionar o avisar.
+        return f"Error ejecutando la herramienta {name}: {e}"
 
 
 # ============================================================
