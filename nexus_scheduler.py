@@ -25,6 +25,7 @@ import nexus_alertas as alertas
 import nexus_tareas as tareas
 import nexus_ninjatrader as nt
 import nexus_telegram as telegram
+import nexus_noticias as noticias
 
 BRIEFING_HORA = nexus._env("NEXUS_BRIEFING_HORA", "")           # "08:00" o vacio
 INSTRUMENTOS = [s.strip().upper() for s in nexus._env("NEXUS_BRIEFING_INSTRUMENTOS", "").split(",") if s.strip()]
@@ -82,6 +83,13 @@ def componer_briefing(instrumentos=None) -> str:
             except Exception:
                 val = "s/d"
             partes.append(f"  • {ins}: {val}")
+
+    try:
+        titulares = noticias.texto_titulares(4)
+    except Exception:
+        titulares = ""
+    if titulares:
+        partes.append("\n📰 Mercado:\n" + titulares)
 
     return "\n".join(partes)
 

@@ -46,6 +46,8 @@ import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
 import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_alertas as alertas  # alertas de precio
 import nexus_docs as docs  # RAG-lite sobre documentos
+import nexus_noticias as noticias  # titulares de mercado
+import nexus_gastos as gastos  # control de gastos
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -54,7 +56,8 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 # NinjaTrader (estado/precio/posicion, no mueven dinero) y productividad (tareas).
 SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
             "read_file", "list_directory"}
-           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS)
+           | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
+           | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS

@@ -3,6 +3,7 @@ memoria.json
 conversaciones.json
 tareas.json
 alertas.json
+gastos.json
 nexus_trades.log
 *.log
 nexus_nt_sim/
