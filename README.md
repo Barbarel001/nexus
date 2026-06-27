@@ -54,6 +54,7 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | ⏰ **Proactive scheduler** | Watches your price alerts and pushes when one triggers; sends a **morning briefing** (weather, tasks, alerts, prices, news) at a time you choose; **auto-backups** your data daily. |
 | 🌤️ **Weather** | Current weather + day forecast for any city via Open-Meteo (free, no key); also in the morning briefing. |
 | 💬 **Discord notifications** | Optionally mirror alerts and the briefing to a Discord channel via webhook. |
+| 📅 **Google (Calendar + Gmail)** | See your agenda, create events, read recent emails and send mail (optional; OAuth). Write actions require confirmation. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -79,6 +80,7 @@ nexus_noticias.py → Market news headlines via public RSS feeds
 nexus_gastos.py   → Personal expense tracker (monthly summaries by category)
 nexus_clima.py    → Weather via Open-Meteo (free, no API key)
 nexus_discord.py  → Outbound Discord notifications (channel webhook)
+nexus_google.py   → Google Calendar + Gmail (optional, OAuth; lazy-imported)
 nexus_util.py     → Base utils: atomic JSON writes (crash-safe), tolerant reads, logging
 nexus_servicio.bat → "Always-on" launcher (auto-restart; add to Windows startup)
 web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
@@ -191,6 +193,22 @@ setx NEXUS_BACKEND ollama     # Windows (reopen the terminal afterwards)
 
 In local mode **no API key is required** and every turn costs **$0**. Tool-use and
 streaming work; quality is a notch below Claude. Set the model with `NEXUS_OLLAMA_MODEL`.
+
+## Google Calendar + Gmail (optional)
+
+See your agenda, create events, read recent emails and send mail from Nexus.
+
+1. `pip install -r requirements-google.txt`
+2. In [Google Cloud Console](https://console.cloud.google.com): create a project,
+   enable the **Calendar** and **Gmail** APIs, create an OAuth client of type
+   **Desktop app**, download the JSON and save it as `credentials.json`.
+3. Authorize once (opens your browser): `python nexus_google.py` → creates `token.json`.
+
+Tools: `google_agenda`, `google_correos` (read), and `google_crear_evento`,
+`google_enviar_correo` (write — these ask for confirmation, like other actions).
+The libraries are imported lazily, so Nexus runs fine without them — the Google
+tools simply explain how to set it up until you do. `credentials.json` / `token.json`
+are git-ignored.
 
 ## Always-on (run Nexus as a background service)
 

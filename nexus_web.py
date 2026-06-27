@@ -49,6 +49,7 @@ import nexus_docs as docs  # RAG-lite sobre documentos
 import nexus_noticias as noticias  # titulares de mercado
 import nexus_gastos as gastos  # control de gastos
 import nexus_clima as clima  # clima
+import nexus_google as google  # Google Calendar + Gmail
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -58,7 +59,8 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
             "read_file", "list_directory"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
-           | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS)
+           | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
+           | google.GOOGLE_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -199,6 +201,8 @@ def ejecutar_peligrosa(name: str, args: dict) -> str:
         return nexus.escribir_archivo(args.get("path", ""), args.get("content", ""))
     if name in nt.NT_PELIGROSAS:  # ordenes de NinjaTrader (ya aprobadas en el modal)
         return nt.NT_EJECUTORES[name](args)
+    if name in google.GOOGLE_PELIGROSAS:  # crear evento / enviar correo (ya aprobado)
+        return google.GOOGLE_EJECUTORES[name](args)
     return f"Herramienta desconocida: {name}"
 
 
@@ -216,6 +220,8 @@ def resumen_accion(name: str, args: dict) -> str:
     if name == "nt_cerrar":
         return "Aplanar TODO en NinjaTrader" if (args.get("todo") or not args.get("instrument")) \
             else f"Cerrar posicion {args.get('instrument')}"
+    if name in google.GOOGLE_PELIGROSAS:
+        return google.resumen_accion(name, args)
     return name
 
 

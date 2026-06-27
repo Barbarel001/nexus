@@ -13,6 +13,8 @@ backups/
 # Variables de entorno / secretos
 .env
 *.key
+credentials.json
+token.json
 
 # Config local del editor/preview
 .claude/
