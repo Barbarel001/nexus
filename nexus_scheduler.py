@@ -16,20 +16,43 @@ Configuracion:
     NEXUS_SCHED_INTERVALO        Segundos entre comprobaciones (defecto 60).
 """
 
+import os
 import time
 import datetime
 import threading
 
 import nexus
+import nexus_util
 import nexus_alertas as alertas
 import nexus_tareas as tareas
+import nexus_gastos as gastos
 import nexus_ninjatrader as nt
 import nexus_telegram as telegram
+import nexus_discord as discord
 import nexus_noticias as noticias
+import nexus_clima as clima
 
 BRIEFING_HORA = nexus._env("NEXUS_BRIEFING_HORA", "")           # "08:00" o vacio
 INSTRUMENTOS = [s.strip().upper() for s in nexus._env("NEXUS_BRIEFING_INSTRUMENTOS", "").split(",") if s.strip()]
 INTERVALO = int(nexus._env("NEXUS_SCHED_INTERVALO", "60"))
+BACKUP_DIR = nexus._env("NEXUS_BACKUP_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups"))
+BACKUP_KEEP = int(nexus._env("NEXUS_BACKUP_KEEP", "7"))
+
+
+def _notificar(texto: str) -> None:
+    """Envia una notificacion por todos los canales configurados (Telegram, Discord)."""
+    telegram.enviar(texto)
+    discord.enviar(texto)
+
+
+def _archivos_datos() -> list:
+    """Rutas de los datos personales a respaldar."""
+    return [nexus.MEMORIA_PATH, tareas.TAREAS_PATH, alertas.ALERTAS_PATH,
+            gastos.GASTOS_PATH, nt.NT_LOG]
+
+
+def respaldar() -> int:
+    return nexus_util.respaldar(_archivos_datos(), BACKUP_DIR, BACKUP_KEEP)
 
 
 # --------------------------- Logica pura (testeable) ---------------------------
@@ -58,6 +81,10 @@ def componer_briefing(instrumentos=None) -> str:
     """Arma el texto del resumen matutino con datos del lado servidor."""
     instrumentos = INSTRUMENTOS if instrumentos is None else instrumentos
     partes = ["☀️ Buenos días. Tu resumen de hoy:"]
+
+    clima_txt = clima.texto()
+    if clima_txt:
+        partes.append(f"\n🌤️ {clima_txt}")
 
     venc = tareas.filtrar("vencidas")
     hoy = tareas.filtrar("hoy")
@@ -107,18 +134,23 @@ def correr(intervalo: int = None, _max_ciclos: int = None):
     """Bucle del scheduler (bloqueante). `_max_ciclos` es solo para tests."""
     intervalo = INTERVALO if intervalo is None else intervalo
     ultima_briefing = None
+    ultimo_backup = None
     ciclos = 0
     while True:
         try:
             for msg in revisar_alertas():
-                telegram.enviar(msg)
+                _notificar(msg)
         except Exception:
             pass
         try:
             ahora = datetime.datetime.now()
             if toca_briefing(ahora, ultima_briefing):
-                telegram.enviar(componer_briefing())
+                _notificar(componer_briefing())
                 ultima_briefing = ahora.date()
+            # Respaldo automatico una vez al dia.
+            if ultimo_backup != ahora.date():
+                respaldar()
+                ultimo_backup = ahora.date()
         except Exception:
             pass
         ciclos += 1

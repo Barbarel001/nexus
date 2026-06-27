@@ -41,6 +41,7 @@ import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
 import nexus_docs as docs  # RAG-lite sobre documentos del usuario
 import nexus_noticias as noticias  # titulares de mercado (RSS)
 import nexus_gastos as gastos  # control de gastos personales
+import nexus_clima as clima  # clima (Open-Meteo, gratis)
 
 
 # ============================================================
@@ -124,6 +125,7 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - buscar_documentos: responder con base en los documentos personales del usuario (.txt/.md/.pdf).
 - noticias_mercado: ultimos titulares de noticias de mercados financieros.
 - agregar_gasto / resumen_gastos / eliminar_gasto: control de gastos personales por mes y categoria.
+- clima: tiempo actual y pronostico del dia de una ciudad.
 
 Contexto del usuario:
 - Sabe programar (Python) y quiere conseguir ingresos como freelance de bots
@@ -370,6 +372,7 @@ TOOLS += alertas.ALERTAS_TOOLS
 TOOLS += docs.DOCS_TOOLS
 TOOLS += noticias.NEWS_TOOLS
 TOOLS += gastos.GASTOS_TOOLS
+TOOLS += clima.CLIMA_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero o tocan el
 # sistema): piden confirmacion en la terminal y van detras del modal en la web,
@@ -620,6 +623,7 @@ EJECUTORES.update(alertas.ALERTAS_EJECUTORES)
 EJECUTORES.update(docs.DOCS_EJECUTORES)
 EJECUTORES.update(noticias.NEWS_EJECUTORES)
 EJECUTORES.update(gastos.GASTOS_EJECUTORES)
+EJECUTORES.update(clima.CLIMA_EJECUTORES)
 
 
 def ejecutar_herramienta(name: str, args: dict) -> str:

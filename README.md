@@ -51,7 +51,9 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🎨 **Theme & PWA** | Light/dark theme + accent color picker; **installable as a PWA** (manifest + service worker) to use Nexus like a native app on your phone. |
 | 👁️ **Vision** | Send an image — upload in the web (📎) or a photo on Telegram — and Nexus analyzes it (read charts, screenshots, scanned docs). Uses Claude vision. |
 | 🤖 **Telegram bot** | Control Nexus and get notifications from anywhere (no tunnel): chat, tasks, alerts, prices, **photos** — with a chat-id allowlist. Money-moving tools are disabled over Telegram. |
-| ⏰ **Proactive scheduler** | Watches your price alerts and pushes a Telegram message when one triggers; sends a **morning briefing** (tasks due, alerts, prices) at a time you choose. |
+| ⏰ **Proactive scheduler** | Watches your price alerts and pushes when one triggers; sends a **morning briefing** (weather, tasks, alerts, prices, news) at a time you choose; **auto-backups** your data daily. |
+| 🌤️ **Weather** | Current weather + day forecast for any city via Open-Meteo (free, no key); also in the morning briefing. |
+| 💬 **Discord notifications** | Optionally mirror alerts and the briefing to a Discord channel via webhook. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -75,6 +77,8 @@ nexus_scheduler.py → Proactive jobs: alert watch + morning briefing (push via 
 nexus_docs.py     → Docs/RAG-lite: keyword search over your .txt/.md/.pdf files
 nexus_noticias.py → Market news headlines via public RSS feeds
 nexus_gastos.py   → Personal expense tracker (monthly summaries by category)
+nexus_clima.py    → Weather via Open-Meteo (free, no API key)
+nexus_discord.py  → Outbound Discord notifications (channel webhook)
 nexus_util.py     → Base utils: atomic JSON writes (crash-safe), tolerant reads, logging
 nexus_servicio.bat → "Always-on" launcher (auto-restart; add to Windows startup)
 web/index.html    → HUD front-end: streaming render, history sidebar, dashboard panel, voice, theme, PWA
@@ -163,6 +167,10 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_NEWS_FEEDS` | *(defaults)* | Comma-separated RSS URLs for market news |
 | `NEXUS_GASTOS_PATH` | `gastos.json` | Where expenses are stored (git-ignored) |
 | `NEXUS_MONEDA` | `$` | Currency symbol for expense display |
+| `NEXUS_CIUDAD` | *(none)* | Default city for weather (tool + morning briefing) |
+| `NEXUS_DISCORD_WEBHOOK` | *(none)* | Discord channel webhook URL for notifications |
+| `NEXUS_BACKUP_DIR` | `backups/` | Where daily data backups are stored (git-ignored) |
+| `NEXUS_BACKUP_KEEP` | `7` | How many daily backups to keep |
 
 In the web UI you can also pick the model and set your name from the **⚙ settings panel**.
 

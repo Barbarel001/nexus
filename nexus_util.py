@@ -12,6 +12,7 @@ evitar imports circulares).
 
 import os
 import json
+import shutil
 import tempfile
 import datetime
 
@@ -43,6 +44,35 @@ def cargar_json(path: str, defecto=None):
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return defecto
+
+
+def respaldar(rutas, carpeta_dest: str, keep: int = 7) -> int:
+    """Copia los archivos indicados a carpeta_dest/<AAAA-MM-DD>/ y conserva solo las
+    ultimas `keep` carpetas de fecha. Devuelve cuantos archivos copio. No lanza."""
+    try:
+        fecha = datetime.date.today().isoformat()
+        destino = os.path.join(carpeta_dest, fecha)
+        os.makedirs(destino, exist_ok=True)
+    except OSError:
+        return 0
+    copiados = 0
+    for r in rutas:
+        try:
+            if os.path.isfile(r):
+                shutil.copy2(r, os.path.join(destino, os.path.basename(r)))
+                copiados += 1
+        except OSError:
+            pass
+    # Limpieza de respaldos antiguos.
+    try:
+        carpetas = sorted(d for d in os.listdir(carpeta_dest)
+                          if os.path.isdir(os.path.join(carpeta_dest, d)))
+        if keep > 0:
+            for d in carpetas[:-keep]:
+                shutil.rmtree(os.path.join(carpeta_dest, d), ignore_errors=True)
+    except OSError:
+        pass
+    return copiados
 
 
 def log(mensaje: str, nivel: str = "INFO") -> None:
