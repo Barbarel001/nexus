@@ -199,3 +199,50 @@ def test_confirm_rid_desconocido():
 def test_resumen_accion():
     assert "echo hola" in nexus_web.resumen_accion("run_command", {"command": "echo hola"})
     assert "archivo" in nexus_web.resumen_accion("write_file", {"path": "x.txt", "content": "ab"}).lower()
+
+
+# --------------------------- Autenticacion (login opcional) ---------------------------
+
+def test_sin_password_no_pide_login():
+    """Por defecto (sin NEXUS_PASSWORD) no hay login: el uso local sigue igual."""
+    c = nexus_web.app.test_client()
+    assert c.get("/api/config").status_code == 200
+
+
+def test_vision_sin_imagen():
+    c = nexus_web.app.test_client()
+    r = c.post("/api/vision", json={})
+    assert r.status_code == 400
+
+
+def test_vision_ok(monkeypatch, tmp_path):
+    monkeypatch.setattr(nexus_web, "CONV_PATH", str(tmp_path / "c.json"))
+    # No llamamos a la API real: simulamos el analisis.
+    monkeypatch.setattr(nexus_web.nexus, "analizar_imagen",
+                        lambda *a, **k: ("Veo un gráfico alcista del ES.", {"in": 10, "out": 5}))
+    c = nexus_web.app.test_client()
+    r = c.post("/api/vision", json={"image": "data:image/png;base64,AAAA", "prompt": "analiza", "cid": "abc"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True and "alcista" in d["texto"]
+    # se guardo en la conversacion
+    conv = nexus_web.buscar_conv(nexus_web.cargar_convs(), "abc")
+    assert conv and any("vision" in (t.get("tools") or []) for t in conv["turnos"])
+
+
+def test_con_password_bloquea_y_permite(monkeypatch):
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "secreta123")
+    c = nexus_web.app.test_client()
+    # sin login: la API responde 401 y las paginas redirigen al login
+    assert c.get("/api/config").status_code == 401
+    assert c.get("/").status_code in (301, 302)
+    # login con clave incorrecta no autentica
+    c.post("/login", data={"password": "mala"})
+    assert c.get("/api/config").status_code == 401
+    # login correcto: ya hay acceso
+    r = c.post("/login", data={"password": "secreta123"})
+    assert r.status_code in (301, 302)
+    assert c.get("/api/config").status_code == 200
+    # logout vuelve a bloquear
+    c.get("/logout")
+    assert c.get("/api/config").status_code == 401

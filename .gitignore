@@ -1,10 +1,20 @@
 # Datos personales de Nexus (NO publicar)
 memoria.json
 conversaciones.json
+tareas.json
+alertas.json
+gastos.json
+nexus_trades.log
+*.log
+nexus_nt_sim/
+documentos/
+backups/
 
 # Variables de entorno / secretos
 .env
 *.key
+credentials.json
+token.json
 
 # Config local del editor/preview
 .claude/

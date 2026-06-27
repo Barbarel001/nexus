@@ -20,6 +20,7 @@ Requisitos:
 import os
 import sys
 import json
+import uuid
 import datetime
 
 # Hacer que la salida soporte acentos/emoji en la terminal de Windows.
@@ -33,7 +34,15 @@ try:
 except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
+import nexus_util  # utilidades base (escritura atomica, logging)
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
+import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
+import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
+import nexus_docs as docs  # RAG-lite sobre documentos del usuario
+import nexus_noticias as noticias  # titulares de mercado (RSS)
+import nexus_gastos as gastos  # control de gastos personales
+import nexus_clima as clima  # clima (Open-Meteo, gratis)
+import nexus_google as google  # Google Calendar + Gmail (opcional)
 
 
 # ============================================================
@@ -106,8 +115,20 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - web_search: para datos actuales o cosas que no sabes con certeza.
 - run_command: para ejecutar comandos en la PC (Windows / PowerShell).
 - read_file / write_file / list_directory: para trabajar con archivos.
-- nt_estado / nt_precio / nt_posicion: consultar NinjaTrader (conexion, precios, posiciones).
-- nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion).
+- nt_estado / nt_precio / nt_posicion / nt_historial / nt_diario: consultar NinjaTrader
+  (conexion, precios, posiciones, bitacora y diario de trading).
+- nt_orden / nt_cancelar / nt_cerrar: operar en NinjaTrader (DINERO REAL; pide confirmacion;
+  sujeto a las reglas de gestion de riesgo configuradas).
+- agregar_tarea / listar_tareas / completar_tarea / eliminar_tarea: gestionar tareas y
+  recordatorios del usuario (con fecha de vencimiento y prioridad).
+- alerta_precio: crear/listar/eliminar/evaluar alertas de precio (ej. "avisame si el ES toca 5000").
+- buscar_memoria / olvidar_memoria: consultar o borrar notas de tu memoria a largo plazo.
+- buscar_documentos: responder con base en los documentos personales del usuario (.txt/.md/.pdf).
+- noticias_mercado: ultimos titulares de noticias de mercados financieros.
+- agregar_gasto / resumen_gastos / eliminar_gasto: control de gastos personales por mes y categoria.
+- clima: tiempo actual y pronostico del dia de una ciudad.
+- google_agenda / google_correos: ver tu Google Calendar y Gmail (si esta configurado).
+- google_crear_evento / google_enviar_correo: crear eventos o enviar correos (pide confirmacion).
 
 Contexto del usuario:
 - Sabe programar (Python) y quiere conseguir ingresos como freelance de bots
@@ -131,37 +152,93 @@ Reglas:
 #  MEMORIA PERSISTENTE
 # ============================================================
 
-def cargar_memoria() -> list:
+def _normalizar_nota(item) -> dict:
+    """Acepta tanto el formato antiguo (texto plano) como el nuevo (objeto con
+    categoria) y devuelve siempre un objeto. Compatibilidad hacia atras."""
+    if isinstance(item, dict):
+        return {"id": item.get("id") or uuid.uuid4().hex[:6],
+                "texto": str(item.get("texto", "")).strip(),
+                "categoria": (item.get("categoria") or "general").strip().lower(),
+                "creada": item.get("creada", "")}
+    return {"id": uuid.uuid4().hex[:6], "texto": str(item).strip(),
+            "categoria": "general", "creada": ""}
+
+
+def cargar_notas() -> list:
+    """Memoria completa como lista de objetos {id, texto, categoria, creada}."""
     try:
         with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
-            return json.load(f).get("notas", [])
+            crudas = json.load(f).get("notas", [])
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+    return [n for n in (_normalizar_nota(x) for x in crudas) if n["texto"]]
 
 
-def guardar_nota(nota: str) -> bool:
-    """Guarda una nota en la memoria. Deduplica (ignorando mayusculas) y aplica un
-    tope FIFO (MAX_NOTAS) para que memoria.json no crezca sin limite ni infle el
-    system prompt. Devuelve True si la guardo, False si estaba vacia o ya existia."""
+def cargar_memoria() -> list:
+    """Lista de textos recordados (compatibilidad: lo usa el system prompt)."""
+    return [n["texto"] for n in cargar_notas()]
+
+
+def _guardar_notas(notas: list) -> None:
+    nexus_util.guardar_json(MEMORIA_PATH, {"notas": notas})
+
+
+def guardar_nota(nota: str, categoria: str = "general") -> bool:
+    """Guarda una nota (con categoria opcional). Deduplica por texto (ignorando
+    mayusculas) y aplica un tope FIFO (MAX_NOTAS). Devuelve True si la guardo."""
     nota = (nota or "").strip()
     if not nota:
         return False
-    notas = cargar_memoria()
-    if any(n.strip().lower() == nota.lower() for n in notas):
+    notas = cargar_notas()
+    if any(n["texto"].lower() == nota.lower() for n in notas):
         return False  # ya la recordaba
-    notas.append(nota)
+    notas.append({"id": uuid.uuid4().hex[:6], "texto": nota,
+                  "categoria": (categoria or "general").strip().lower(),
+                  "creada": HOY})
     if len(notas) > MAX_NOTAS:
         notas = notas[-MAX_NOTAS:]
-    with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
-        json.dump({"notas": notas}, f, ensure_ascii=False, indent=2)
+    _guardar_notas(notas)
     return True
 
 
+def buscar_notas(consulta: str) -> list:
+    """Busca notas cuyo texto o categoria contengan la consulta (sin mayus/minus)."""
+    q = (consulta or "").strip().lower()
+    if not q:
+        return cargar_notas()
+    return [n for n in cargar_notas() if q in n["texto"].lower() or q in n["categoria"]]
+
+
+def olvidar_nota(ref: str) -> str:
+    """Borra una nota por id (prefijo) o por substring de su texto."""
+    ref = (ref or "").strip().lower()
+    if not ref:
+        return "Indica que quieres olvidar (id o parte del texto)."
+    notas = cargar_notas()
+    coincide = [n for n in notas if n["id"].lower().startswith(ref)] or \
+               [n for n in notas if ref in n["texto"].lower()]
+    if not coincide:
+        return f"No encontre nada en memoria que coincida con '{ref}'."
+    if len(coincide) > 1:
+        ids = ", ".join(f"{n['id']} ({n['texto'][:30]})" for n in coincide[:5])
+        return f"Hay varias notas que coinciden. Precisa el id: {ids}"
+    objetivo = coincide[0]
+    _guardar_notas([n for n in notas if n["id"] != objetivo["id"]])
+    return f"Olvidado: {objetivo['texto']}"
+
+
 def construir_system_prompt() -> str:
-    notas = cargar_memoria()
+    notas = cargar_notas()
     if not notas:
         return BASE_PROMPT
-    lista = "\n".join(f"- {n}" for n in notas)
+    # Agrupadas por categoria para que el modelo las use con mas contexto.
+    por_cat = {}
+    for n in notas:
+        por_cat.setdefault(n["categoria"], []).append(n["texto"])
+    bloques = []
+    for cat, items in por_cat.items():
+        bloques.append(f"[{cat}]\n" + "\n".join(f"- {t}" for t in items))
+    lista = "\n".join(bloques)
     return BASE_PROMPT + f"\n\nESTO ES LO QUE RECUERDAS de antes (usalo con naturalidad):\n{lista}\n"
 
 
@@ -193,12 +270,34 @@ TOOLS = [
         "description": (
             "Guarda un dato importante en tu memoria a largo plazo para recordarlo en "
             "futuras sesiones (el nombre del usuario, sus preferencias, sus metas, datos "
-            "de sus proyectos, o cualquier cosa que pida recordar)."
+            "de sus proyectos, o cualquier cosa que pida recordar). Puedes indicar una "
+            "categoria (ej. 'personal', 'trabajo', 'trading', 'salud')."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"nota": {"type": "string", "description": "El dato a recordar, en una frase clara."}},
+            "properties": {
+                "nota": {"type": "string", "description": "El dato a recordar, en una frase clara."},
+                "categoria": {"type": "string", "description": "Categoria opcional (ej. personal, trabajo, trading)."},
+            },
             "required": ["nota"],
+        },
+    },
+    {
+        "name": "buscar_memoria",
+        "description": "Busca en tu memoria a largo plazo notas que coincidan con una consulta o categoria.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"consulta": {"type": "string", "description": "Texto o categoria a buscar."}},
+            "required": [],
+        },
+    },
+    {
+        "name": "olvidar_memoria",
+        "description": "Borra una nota de la memoria a largo plazo, por su id o por parte de su texto.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ref": {"type": "string", "description": "Id de la nota o parte de su texto."}},
+            "required": ["ref"],
         },
     },
     {
@@ -269,14 +368,21 @@ TOOLS = [
     {"type": "web_search_20260209", "name": "web_search", "allowed_callers": ["direct"]},
 ]
 
-# Herramientas de NinjaTrader (trading). Se anaden al set general.
+# Herramientas de NinjaTrader (trading), productividad y alertas. Se anaden al set general.
 TOOLS += nt.NT_TOOLS
+TOOLS += tareas.TAREAS_TOOLS
+TOOLS += alertas.ALERTAS_TOOLS
+TOOLS += docs.DOCS_TOOLS
+TOOLS += noticias.NEWS_TOOLS
+TOOLS += gastos.GASTOS_TOOLS
+TOOLS += clima.CLIMA_TOOLS
+TOOLS += google.GOOGLE_TOOLS
 
-# Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero o tocan el
-# sistema): piden confirmacion en la terminal y van detras del modal en la web,
-# donde ademas estan desactivadas por defecto. La web y el backend Ollama leen
-# este set para no tener que repetir la lista.
-HERRAMIENTAS_PELIGROSAS = {"run_command", "write_file"} | nt.NT_PELIGROSAS
+# Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero, tocan el
+# sistema o hacen acciones externas): piden confirmacion en la terminal y van detras
+# del modal en la web, donde ademas estan desactivadas por defecto. La web y el
+# backend Ollama leen este set para no tener que repetir la lista.
+HERRAMIENTAS_PELIGROSAS = {"run_command", "write_file"} | nt.NT_PELIGROSAS | google.GOOGLE_PELIGROSAS
 
 
 # ============================================================
@@ -297,9 +403,21 @@ def tool_recordar(args: dict) -> str:
     nota = (args.get("nota") or "").strip()
     if not nota:
         return "No se indico que recordar."
-    if guardar_nota(nota):
-        return f"Anotado en memoria: {nota}"
+    cat = (args.get("categoria") or "general").strip().lower()
+    if guardar_nota(nota, cat):
+        return f"Anotado en memoria [{cat}]: {nota}"
     return f"Ya lo tenia recordado: {nota}"
+
+
+def tool_buscar_memoria(args: dict) -> str:
+    notas = buscar_notas(args.get("consulta", ""))
+    if not notas:
+        return "No encontre nada en memoria con esa consulta."
+    return "\n".join(f"[{n['id']}] ({n['categoria']}) {n['texto']}" for n in notas[:30])
+
+
+def tool_olvidar_memoria(args: dict) -> str:
+    return olvidar_nota(args.get("ref", ""))
 
 
 def tool_rastrear_ofertas(args: dict) -> str:
@@ -476,6 +594,18 @@ def tool_nt_cancelar(args: dict) -> str:
     return nt.cancelar(args)
 
 
+def tool_google_crear_evento(args: dict) -> str:
+    if not _confirmar(f"Nexus quiere CREAR un evento en tu Google Calendar:\n    {google.resumen_accion('google_crear_evento', args)}"):
+        return "El usuario denego crear el evento."
+    return google.tool_crear_evento(args)
+
+
+def tool_google_enviar_correo(args: dict) -> str:
+    if not _confirmar(f"Nexus quiere ENVIAR un correo por Gmail:\n    {google.resumen_accion('google_enviar_correo', args)}"):
+        return "El usuario denego enviar el correo."
+    return google.tool_enviar_correo(args)
+
+
 def tool_nt_cerrar(args: dict) -> str:
     que = "APLANAR TODO (cerrar posiciones y cancelar ordenes)" if (args.get("todo") or not args.get("instrument")) \
         else f"cerrar la posicion de {args.get('instrument')}"
@@ -486,6 +616,8 @@ def tool_nt_cerrar(args: dict) -> str:
 
 EJECUTORES = {
     "recordar": tool_recordar,
+    "buscar_memoria": tool_buscar_memoria,
+    "olvidar_memoria": tool_olvidar_memoria,
     "rastrear_ofertas": tool_rastrear_ofertas,
     "run_command": tool_run_command,
     "read_file": tool_read_file,
@@ -495,17 +627,105 @@ EJECUTORES = {
     "nt_estado": nt.NT_EJECUTORES["nt_estado"],
     "nt_precio": nt.NT_EJECUTORES["nt_precio"],
     "nt_posicion": nt.NT_EJECUTORES["nt_posicion"],
+    "nt_historial": nt.NT_EJECUTORES["nt_historial"],
+    "nt_diario": nt.NT_EJECUTORES["nt_diario"],
     "nt_orden": tool_nt_orden,
     "nt_cancelar": tool_nt_cancelar,
     "nt_cerrar": tool_nt_cerrar,
 }
+# Productividad (tareas/recordatorios) y alertas de precio: herramientas seguras.
+EJECUTORES.update(tareas.TAREAS_EJECUTORES)
+EJECUTORES.update(alertas.ALERTAS_EJECUTORES)
+EJECUTORES.update(docs.DOCS_EJECUTORES)
+EJECUTORES.update(noticias.NEWS_EJECUTORES)
+EJECUTORES.update(gastos.GASTOS_EJECUTORES)
+EJECUTORES.update(clima.CLIMA_EJECUTORES)
+# Google: lectura directa; acciones (crear evento / enviar correo) con confirmacion.
+EJECUTORES.update({
+    "google_agenda": google.GOOGLE_EJECUTORES["google_agenda"],
+    "google_correos": google.GOOGLE_EJECUTORES["google_correos"],
+    "google_crear_evento": tool_google_crear_evento,
+    "google_enviar_correo": tool_google_enviar_correo,
+})
 
 
 def ejecutar_herramienta(name: str, args: dict) -> str:
     funcion = EJECUTORES.get(name)
     if funcion is None:
         return f"Herramienta desconocida: {name}"
-    return funcion(args)
+    try:
+        return funcion(args)
+    except Exception as e:
+        # Una herramienta que falla NUNCA debe tumbar el turno del agente: devolvemos
+        # el error como resultado para que el modelo pueda reaccionar o avisar.
+        return f"Error ejecutando la herramienta {name}: {e}"
+
+
+def conversar(messages: list, system_prompt: str = None, tools: list = None,
+              ejecutar=None, model: str = None, max_iter: int = 10) -> tuple:
+    """Ejecuta un turno agentico COMPLETO (sin streaming) y devuelve (texto, usage).
+
+    Reutilizable por canales que no necesitan streaming (Telegram, scheduler, etc.).
+    `messages` se modifica in-place anadiendo las respuestas del modelo y los
+    resultados de herramientas, asi el llamador puede continuar la conversacion.
+    """
+    client = anthropic.Anthropic()
+    system_prompt = system_prompt if system_prompt is not None else construir_system_prompt()
+    tools = TOOLS if tools is None else tools
+    ejecutar = ejecutar or ejecutar_herramienta
+    model = model or MODEL
+    texto = ""
+    tin = tout = 0
+    for _ in range(max_iter):
+        kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system_prompt,
+                      tools=tools, messages=messages)
+        _th = thinking_para(model)
+        if _th:
+            kwargs["thinking"] = _th
+        resp = client.messages.create(**kwargs)
+        if getattr(resp, "usage", None):
+            tin += resp.usage.input_tokens
+            tout += resp.usage.output_tokens
+        messages.append({"role": "assistant", "content": resp.content})
+        for b in resp.content:
+            if getattr(b, "type", None) == "text":
+                texto += b.text
+        if resp.stop_reason == "tool_use":
+            resultados = []
+            for b in resp.content:
+                if getattr(b, "type", None) == "tool_use":
+                    salida = ejecutar(b.name, b.input)
+                    resultados.append({"type": "tool_result", "tool_use_id": b.id, "content": salida})
+            messages.append({"role": "user", "content": resultados})
+            continue
+        if resp.stop_reason == "pause_turn":
+            continue
+        break
+    return texto.strip(), {"in": tin, "out": tout}
+
+
+MEDIA_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+               "gif": "image/gif", "webp": "image/webp"}
+
+
+def analizar_imagen(image_b64: str, media_type: str = "image/jpeg",
+                    prompt: str = "", model: str = None) -> tuple:
+    """Analiza una imagen con la vision de Claude. Devuelve (texto, usage).
+
+    `image_b64` es la imagen en base64 (sin el prefijo data:). Requiere el backend
+    de Claude (la vision no esta disponible en el modelo local de texto)."""
+    client = anthropic.Anthropic()
+    model = model or MODEL
+    contenido = [
+        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
+        {"type": "text", "text": prompt or "Analiza esta imagen en detalle y dime lo relevante."},
+    ]
+    resp = client.messages.create(model=model, max_tokens=MAX_TOKENS,
+                                  system=construir_system_prompt(),
+                                  messages=[{"role": "user", "content": contenido}])
+    texto = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    usage = {"in": resp.usage.input_tokens, "out": resp.usage.output_tokens} if getattr(resp, "usage", None) else {"in": 0, "out": 0}
+    return texto.strip(), usage
 
 
 # ============================================================
@@ -529,6 +749,9 @@ def main():
     recordadas = len(cargar_memoria())
     if recordadas:
         print(f"  (memoria: {recordadas} cosas recordadas)")
+    pendientes = tareas.resumen_pendientes()
+    if pendientes:
+        print(f"  (tareas: {pendientes})")
     print("  (escribe 'salir' para terminar)")
     print("=" * 52)
 

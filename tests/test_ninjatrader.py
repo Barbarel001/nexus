@@ -153,3 +153,163 @@ def test_orden_requiere_confirmacion(monkeypatch, tmp_path):
     out = nexus.EJECUTORES["nt_orden"]({"instrument": "AAPL", "action": "BUY", "qty": 1})
     assert "denego" in out.lower()
     assert os.listdir(tmp_path) == []  # no se escribio ninguna orden
+
+
+# --------------------------- Bitacora de auditoria ---------------------------
+
+def test_orden_se_registra_en_bitacora(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "trades.log"))
+    nt.colocar_orden({"instrument": "MNQ", "action": "BUY", "qty": 1})
+    lineas = nt.leer_auditoria()
+    assert len(lineas) == 1
+    assert "ORDEN" in lineas[0] and "MNQ" in lineas[0] and "enviada" in lineas[0]
+
+
+def test_auditar_nunca_lanza(monkeypatch):
+    # Aunque la ruta sea invalida, auditar() no debe lanzar.
+    monkeypatch.setattr(nt, "NT_LOG", "/ruta/que/no/existe/y/no/se/puede/crear.log")
+    nt.auditar("ORDEN", "x")  # no debe lanzar
+
+
+def test_historial_vacio_y_lleno(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "trades.log"))
+    assert "Aun no hay" in nt.historial({})
+    nt.auditar("CANCELAR", "todas", "enviada")
+    out = nt.historial({"n": 5})
+    assert "CANCELAR" in out
+
+
+def test_historial_registrado_en_nexus():
+    assert "nt_historial" in nexus.EJECUTORES
+    assert "nt_historial" in nt.NT_SEGURAS
+    assert "nt_historial" not in nexus.HERRAMIENTAS_PELIGROSAS
+
+
+# --------------------------- Robustez del despacho de herramientas ---------------------------
+
+def test_ejecutar_herramienta_captura_excepciones(monkeypatch):
+    def explota(_):
+        raise RuntimeError("boom")
+    monkeypatch.setitem(nexus.EJECUTORES, "nt_estado", explota)
+    out = nexus.ejecutar_herramienta("nt_estado", {})
+    assert "Error ejecutando" in out and "boom" in out  # no se propaga la excepcion
+
+
+# --------------------------- OCO: stop-loss / take-profit ---------------------------
+
+def test_accion_opuesta():
+    assert nt.accion_opuesta("BUY") == "SELL"
+    assert nt.accion_opuesta("SELL") == "BUY"
+    assert nt.accion_opuesta("SELLSHORT") == "BUYTOCOVER"
+
+
+def test_orden_con_oco_envia_tres_ordenes(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    out = nt.colocar_orden({"instrument": "ES 12-25", "action": "BUY", "qty": 1,
+                            "stop_loss": "4990", "take_profit": "5030"})
+    assert "OCO" in out
+    archivos = [p for p in os.listdir(tmp_path) if p.startswith("oif_nexus_")]
+    assert len(archivos) == 3  # entrada + stop + objetivo
+    # Las protecciones usan la accion opuesta (SELL) y comparten un OCO id
+    contenidos = []
+    for p in sorted(archivos):
+        with open(os.path.join(tmp_path, p), encoding="utf-8") as f:
+            contenidos.append(f.read())
+    todo = "".join(contenidos)
+    assert "nexus_oco_" in todo
+    assert todo.count("SELL") >= 2  # stop y objetivo cierran un BUY
+
+
+def test_resumen_orden_incluye_oco():
+    r = nt.resumen_orden({"instrument": "ES", "action": "BUY", "qty": 1,
+                          "stop_loss": "4990", "take_profit": "5030"})
+    assert "stop-loss 4990" in r and "take-profit 5030" in r
+
+
+# --------------------------- Modo simulacion ---------------------------
+
+def test_modo_simulacion_precio_y_estado(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path / "sim"))
+    # carpeta_ok crea la carpeta y devuelve True aunque no exista al inicio
+    assert nt.carpeta_ok() is True
+    # precio simulado: numero parseable, cercano a la base de ES
+    val = float(nt.leer_precio("ES 12-25", "LAST", espera=0))
+    assert 4900 < val < 5100
+    assert "SIMULACION" in nt.estado()
+
+
+def test_simulacion_orden_se_guarda_local(tmp_path, monkeypatch):
+    sim = tmp_path / "sim"
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(sim))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    out = nt.colocar_orden({"instrument": "MNQ", "action": "BUY", "qty": 1})
+    assert "enviada" in out.lower()
+    assert any(p.startswith("oif_nexus_") for p in os.listdir(sim))  # quedó local
+
+
+def test_diagnostico_no_revienta(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_SIMULAR", True)
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path / "sim"))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    rep = nt.diagnostico()
+    assert "Diagnostico" in rep and "Modo simulacion" in rep
+
+
+# --------------------------- Gestion de riesgo ---------------------------
+
+def test_riesgo_cantidad_maxima(monkeypatch):
+    monkeypatch.setattr(nt, "RISK_MAX_QTY", 2)
+    assert nt.verificar_riesgo({"instrument": "ES", "action": "BUY", "qty": 5}) is not None
+    assert nt.verificar_riesgo({"instrument": "ES", "action": "BUY", "qty": 2}) is None
+
+
+def test_riesgo_instrumentos_permitidos(monkeypatch):
+    monkeypatch.setattr(nt, "RISK_INSTRUMENTOS", {"ES 12-25"})
+    assert nt.verificar_riesgo({"instrument": "AAPL", "action": "BUY", "qty": 1}) is not None
+    assert nt.verificar_riesgo({"instrument": "es 12-25", "action": "BUY", "qty": 1}) is None
+
+
+def test_riesgo_bloquea_orden(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    monkeypatch.setattr(nt, "RISK_MAX_QTY", 1)
+    out = nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 10})
+    assert "BLOQUEADA" in out
+    assert os.listdir(tmp_path) == ["t.log"]  # no se escribio ningun OIF
+
+
+def test_ordenes_hoy_cuenta(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1})
+    nt.colocar_orden({"instrument": "MNQ", "action": "SELL", "qty": 1})
+    assert nt.ordenes_hoy() == 2
+
+
+def test_riesgo_max_ordenes_dia(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    monkeypatch.setattr(nt, "RISK_MAX_ORDENES", 1)
+    assert "enviada" in nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1}).lower()
+    # la segunda del dia se bloquea
+    assert "BLOQUEADA" in nt.colocar_orden({"instrument": "ES", "action": "BUY", "qty": 1})
+
+
+# --------------------------- Diario de trading ---------------------------
+
+def test_diario_vacio(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    assert "vacio" in nt.diario().lower()
+
+
+def test_diario_resume(tmp_path, monkeypatch):
+    monkeypatch.setattr(nt, "NT_FOLDER", str(tmp_path))
+    monkeypatch.setattr(nt, "NT_LOG", str(tmp_path / "t.log"))
+    nt.colocar_orden({"instrument": "ES 12-25", "action": "BUY", "qty": 1})
+    nt.colocar_orden({"instrument": "MNQ", "action": "SELL", "qty": 2})
+    d = nt.diario()
+    assert "2 ordenes" in d and "BUY 1" in d and "SELL 1" in d

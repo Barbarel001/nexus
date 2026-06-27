@@ -30,6 +30,9 @@ DINERO REAL: revisa siempre el resumen antes de aprobar.
 import os
 import glob
 import time
+import math
+import uuid
+import datetime
 
 # --- Configuracion (por entorno; defaults seguros) ------------------------
 
@@ -47,6 +50,49 @@ def _carpeta_incoming_por_defecto() -> str:
 NT_FOLDER = _env("NEXUS_NT_FOLDER", _carpeta_incoming_por_defecto())
 NT_ACCOUNT = _env("NEXUS_NT_ACCOUNT", "Sim101")   # 'Sim101' = simulacion (seguro por defecto)
 NT_ESPERA = float(_env("NEXUS_NT_ESPERA", "2.5"))  # espera maxima por el archivo de precio
+
+# MODO SIMULACION (NEXUS_NT_SIMULAR=1): para PROBAR todo el flujo sin NinjaTrader
+# y sin riesgo. Los precios se generan localmente (se mueven, para ver sparklines y
+# disparar alertas) y las ordenes se escriben en una carpeta local pero NO llegan a
+# ningun broker (nadie las lee). Ideal para una primera prueba de extremo a extremo.
+NT_SIMULAR = _env("NEXUS_NT_SIMULAR", "0").lower() in ("1", "true", "yes", "on", "si")
+if NT_SIMULAR and not os.environ.get("NEXUS_NT_FOLDER"):
+    NT_FOLDER = os.path.join(_carpeta := os.path.dirname(os.path.abspath(__file__)), "nexus_nt_sim")
+
+# Precios base (estables) por instrumento para el modo simulacion.
+_SIM_BASE = {"ES 12-25": 5012, "MES 12-25": 5012, "ES": 5012, "MES": 5012,
+             "NQ 12-25": 21855, "MNQ": 21840, "NQ": 21855,
+             "AAPL": 231, "MSFT": 430, "TSLA": 250, "BTC": 64000}
+
+
+def _base_sim(inst: str) -> float:
+    inst = (inst or "").upper()
+    if inst in _SIM_BASE:
+        return float(_SIM_BASE[inst])
+    return 50.0 + (sum(ord(c) for c in inst) * 7) % 4000  # base plausible y estable
+
+
+def _precio_simulado(inst: str, tipo: str = "LAST") -> str:
+    """Precio simulado que oscila suavemente con el tiempo (para ver movimiento)."""
+    base = _base_sim(inst)
+    osc = math.sin(time.time() / 6.0 + len(inst)) * base * 0.0015  # +-0.15%
+    val = base + osc
+    if tipo == "BID":
+        val -= base * 0.0001
+    elif tipo == "ASK":
+        val += base * 0.0001
+    return f"{val:.2f}"
+
+# Bitacora de auditoria: TODA orden/cancelacion/cierre que Nexus envia queda
+# registrada aqui con fecha y hora. Es clave operando con dinero real.
+_CARPETA = os.path.dirname(os.path.abspath(__file__))
+NT_LOG = _env("NEXUS_NT_LOG", os.path.join(_CARPETA, "nexus_trades.log"))
+
+# Gestion de RIESGO: reglas que se comprueban ANTES de enviar cada orden.
+# 0 / vacio = sin limite. Protegen tu cuenta de errores y excesos.
+RISK_MAX_QTY = int(_env("NEXUS_RISK_MAX_QTY", "0"))            # cantidad maxima por orden
+RISK_MAX_ORDENES = int(_env("NEXUS_RISK_MAX_ORDENES", "0"))    # maximo de ordenes por dia
+RISK_INSTRUMENTOS = {s.strip().upper() for s in _env("NEXUS_RISK_INSTRUMENTOS", "").split(",") if s.strip()}
 
 # Valores validos del protocolo OIF de NinjaTrader.
 ACCIONES = {"BUY", "SELL", "BUYTOCOVER", "SELLSHORT"}
@@ -136,7 +182,61 @@ def construir_flatten() -> str:
 # ============================================================
 
 def carpeta_ok(carpeta: str = None) -> bool:
-    return os.path.isdir(carpeta or NT_FOLDER)
+    carpeta = carpeta or NT_FOLDER
+    if NT_SIMULAR:
+        os.makedirs(carpeta, exist_ok=True)  # en simulacion siempre "conectado"
+        return True
+    return os.path.isdir(carpeta)
+
+
+def auditar(accion: str, detalle: str, resultado: str = "enviado") -> None:
+    """Anade una linea a la bitacora de operaciones. NUNCA lanza: el registro no
+    debe poder interrumpir una operacion. Formato TSV: fecha, accion, detalle, resultado."""
+    try:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        detalle = (detalle or "").replace("\t", " ").replace("\n", " ")
+        with open(NT_LOG, "a", encoding="utf-8") as f:
+            f.write(f"{ts}\t{accion}\t{detalle}\t{resultado}\n")
+    except OSError:
+        pass
+
+
+def leer_auditoria(n: int = 15) -> list:
+    """Devuelve las ultimas n lineas de la bitacora (mas recientes al final)."""
+    try:
+        with open(NT_LOG, "r", encoding="utf-8", errors="replace") as f:
+            lineas = [ln.rstrip("\n") for ln in f if ln.strip()]
+        return lineas[-n:]
+    except FileNotFoundError:
+        return []
+
+
+def ordenes_hoy() -> int:
+    """Cuenta las ordenes ENVIADAS hoy (segun la bitacora)."""
+    hoy = datetime.date.today().isoformat()
+    n = 0
+    for ln in leer_auditoria(1000):
+        partes = ln.split("\t")
+        if len(partes) >= 4 and partes[0].startswith(hoy) and partes[1] == "ORDEN" and "enviada" in partes[3]:
+            n += 1
+    return n
+
+
+def verificar_riesgo(args: dict):
+    """Comprueba las reglas de riesgo. Devuelve None si la orden es aceptable, o un
+    texto explicando por que se rechaza."""
+    inst = _campo(args.get("instrument")).upper()
+    try:
+        qty = int(float(args.get("qty")))
+    except (TypeError, ValueError):
+        qty = 0
+    if RISK_MAX_QTY and qty > RISK_MAX_QTY:
+        return f"la cantidad {qty} supera el maximo por orden ({RISK_MAX_QTY})"
+    if RISK_INSTRUMENTOS and inst not in RISK_INSTRUMENTOS:
+        return f"{inst} no esta en tu lista de instrumentos permitidos"
+    if RISK_MAX_ORDENES and ordenes_hoy() >= RISK_MAX_ORDENES:
+        return f"alcanzaste el limite de {RISK_MAX_ORDENES} ordenes por dia"
+    return None
 
 
 def enviar_comando(linea: str, carpeta: str = None) -> str:
@@ -145,6 +245,8 @@ def enviar_comando(linea: str, carpeta: str = None) -> str:
 
     NO pide confirmacion: eso lo hace quien llama (terminal/web)."""
     carpeta = carpeta or NT_FOLDER
+    if NT_SIMULAR:
+        os.makedirs(carpeta, exist_ok=True)  # en simulacion la carpeta se crea sola
     if not os.path.isdir(carpeta):
         raise FileNotFoundError(
             f"No encuentro la carpeta de NinjaTrader: {carpeta}\n"
@@ -152,7 +254,9 @@ def enviar_comando(linea: str, carpeta: str = None) -> str:
             "activado (Tools -> Options -> Automated trading interface), o define "
             "NEXUS_NT_FOLDER con la ruta correcta de tu carpeta 'incoming'."
         )
-    nombre = f"oif_nexus_{int(time.time() * 1000)}.txt"
+    # Nombre unico incluso si se envian varias ordenes en el mismo milisegundo
+    # (p. ej. un bracket OCO): el sufijo aleatorio evita colisiones/sobrescrituras.
+    nombre = f"oif_nexus_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}.txt"
     ruta = os.path.join(carpeta, nombre)
     with open(ruta, "w", encoding="utf-8") as f:
         f.write(linea + "\n")
@@ -182,6 +286,9 @@ def leer_precio(instrument: str, tipo: str = "LAST", carpeta: str = None,
         raise ValueError("Falta el instrumento.")
     if tipo not in TIPOS_PRECIO:
         raise ValueError(f"Tipo de precio invalido: '{tipo}'. Usa {sorted(TIPOS_PRECIO)}.")
+
+    if NT_SIMULAR:
+        return _precio_simulado(instrument, tipo)  # precio local, sin NinjaTrader
 
     # Pedimos la suscripcion a datos de mercado (NinjaTrader empieza a escribir el archivo).
     enviar_comando(f"SUBSCRIBE;{instrument}", carpeta)
@@ -239,6 +346,14 @@ def leer_posicion(instrument: str, account: str = None, carpeta: str = None) -> 
 #  FUNCIONES DE ALTO NIVEL  (las que llaman las herramientas)
 # ============================================================
 
+_OPUESTA = {"BUY": "SELL", "SELL": "BUY", "SELLSHORT": "BUYTOCOVER", "BUYTOCOVER": "SELLSHORT"}
+
+
+def accion_opuesta(accion: str) -> str:
+    """Accion que CIERRA una posicion abierta con `accion` (para stop/objetivo)."""
+    return _OPUESTA.get((accion or "").upper(), "SELL")
+
+
 def resumen_orden(args: dict) -> str:
     """Texto legible de una orden, para mostrar en la confirmacion."""
     cuenta = _campo(args.get("account")) or NT_ACCOUNT
@@ -251,12 +366,20 @@ def resumen_orden(args: dict) -> str:
         extra.append(f"limite {args.get('limit_price')}")
     if _campo(args.get("stop_price")):
         extra.append(f"stop {args.get('stop_price')}")
+    if _campo(args.get("stop_loss")):
+        extra.append(f"stop-loss {args.get('stop_loss')}")
+    if _campo(args.get("take_profit")):
+        extra.append(f"take-profit {args.get('take_profit')}")
     cola = f" ({', '.join(extra)})" if extra else ""
     return f"{accion} {qty} {inst} {tipo}{cola}  [cuenta {cuenta}]"
 
 
 def estado() -> str:
     carpeta = NT_FOLDER
+    if NT_SIMULAR:
+        return (f"NinjaTrader: MODO SIMULACION activo (NEXUS_NT_SIMULAR=1).\n"
+                f"Precios simulados y ordenes guardadas en {carpeta} (no llegan a ningun broker). "
+                "Ideal para probar sin riesgo. Desactivalo para operar de verdad.")
     if carpeta_ok(carpeta):
         return (f"NinjaTrader: carpeta detectada en {carpeta}.\n"
                 f"Cuenta por defecto: {NT_ACCOUNT}. Listo para operar.")
@@ -282,37 +405,112 @@ def posicion(args: dict) -> str:
         return f"No pude leer la posicion: {e}"
 
 
-def colocar_orden(args: dict) -> str:
-    """Construye y envia una orden PLACE. NO confirma (lo hace quien llama)."""
+def diario(args: dict = None) -> str:
+    """Diario de trading: resume las operaciones de la bitacora (cuantas, por accion,
+    por instrumento y por dia). No es P&L realizado (eso requiere los fills de NT)."""
+    lineas = leer_auditoria(2000)
+    ordenes = []
+    for ln in lineas:
+        p = ln.split("\t")
+        if len(p) >= 4 and p[1] == "ORDEN" and "enviada" in p[3]:
+            fecha = p[0][:10]
+            detalle = p[2]  # ej. "BUY 1 ES 12-25 MARKET ..."
+            accion = detalle.split(" ")[0] if detalle else "?"
+            ordenes.append({"fecha": fecha, "accion": accion, "detalle": detalle})
+    if not ordenes:
+        return "Tu diario esta vacio: aun no hay ordenes enviadas registradas."
+    por_accion, por_dia = {}, {}
+    for o in ordenes:
+        por_accion[o["accion"]] = por_accion.get(o["accion"], 0) + 1
+        por_dia[o["fecha"]] = por_dia.get(o["fecha"], 0) + 1
+    out = [f"📒 Diario de trading — {len(ordenes)} ordenes registradas"]
+    out.append("Por accion: " + ", ".join(f"{k} {v}" for k, v in sorted(por_accion.items())))
+    out.append("Por dia: " + ", ".join(f"{k}: {v}" for k, v in sorted(por_dia.items())[-7:]))
+    out.append("Ultimas:")
+    for o in ordenes[-5:]:
+        out.append(f"  • {o['fecha']}  {o['detalle']}")
+    out.append("(Nota: cuenta ordenes enviadas, no P&L realizado.)")
+    return "\n".join(out)
+
+
+def historial(args: dict = None) -> str:
+    """Muestra las ultimas operaciones registradas en la bitacora de auditoria."""
+    args = args or {}
     try:
-        linea = construir_place(
-            account=args.get("account"), instrument=args.get("instrument"),
-            action=args.get("action"), qty=args.get("qty"),
+        n = int(args.get("n", 15))
+    except (TypeError, ValueError):
+        n = 15
+    n = max(1, min(n, 100))
+    lineas = leer_auditoria(n)
+    if not lineas:
+        return "Aun no hay operaciones registradas en la bitacora."
+    return "Ultimas operaciones (fecha | accion | detalle | resultado):\n" + "\n".join(lineas)
+
+
+def colocar_orden(args: dict) -> str:
+    """Construye y envia una orden PLACE. Si se indican stop_loss y/o take_profit,
+    envia ademas las ordenes de proteccion como un OCO (al ejecutarse una, la otra
+    se cancela). NO confirma (lo hace quien llama)."""
+    cuenta = _campo(args.get("account")) or NT_ACCOUNT
+    qty = args.get("qty")
+    stop_loss = _campo(args.get("stop_loss"))
+    take_profit = _campo(args.get("take_profit"))
+    # Gestion de riesgo: se comprueba ANTES de construir/enviar nada.
+    riesgo = verificar_riesgo(args)
+    if riesgo:
+        auditar("ORDEN", resumen_orden(args), f"BLOQUEADA (riesgo): {riesgo}")
+        return f"Orden BLOQUEADA por gestion de riesgo: {riesgo}."
+    try:
+        entrada = construir_place(
+            account=cuenta, instrument=args.get("instrument"),
+            action=args.get("action"), qty=qty,
             order_type=args.get("order_type", "MARKET"),
             limit_price=args.get("limit_price", ""), stop_price=args.get("stop_price", ""),
             tif=args.get("tif", "DAY"), oco_id=args.get("oco_id", ""),
             order_id=args.get("order_id", ""),
         )
+        # Ordenes de proteccion (cierran la posicion): accion opuesta, mismo OCO.
+        protecciones = []
+        if stop_loss or take_profit:
+            inst = _campo(args.get("instrument"))
+            opuesta = accion_opuesta(args.get("action"))
+            oco = f"nexus_oco_{int(time.time() * 1000)}"
+            if take_profit:
+                protecciones.append(construir_place(
+                    account=cuenta, instrument=inst, action=opuesta, qty=qty,
+                    order_type="LIMIT", limit_price=take_profit, tif="GTC", oco_id=oco))
+            if stop_loss:
+                protecciones.append(construir_place(
+                    account=cuenta, instrument=inst, action=opuesta, qty=qty,
+                    order_type="STOPMARKET", stop_price=stop_loss, tif="GTC", oco_id=oco))
     except ValueError as e:
         return f"Orden rechazada: {e}"
     try:
-        enviar_comando(linea)
+        enviar_comando(entrada)
+        for linea in protecciones:
+            enviar_comando(linea)
     except Exception as e:
+        auditar("ORDEN", resumen_orden(args), f"ERROR: {e}")
         return f"No pude enviar la orden a NinjaTrader: {e}"
-    return f"Orden enviada a NinjaTrader: {resumen_orden(args)}"
+    auditar("ORDEN", resumen_orden(args), "enviada")
+    cola = ""
+    if protecciones:
+        cola = f" + proteccion OCO ({len(protecciones)} ordenes)"
+    return f"Orden enviada a NinjaTrader: {resumen_orden(args)}{cola}"
 
 
 def cancelar(args: dict) -> str:
     """Cancela una orden por id, o TODAS si se pide 'todas'."""
     try:
         if str(args.get("todas", "")).lower() in ("1", "true", "si", "yes") or args.get("order_id") in (None, "", "todas"):
-            linea = construir_cancel_all()
-            enviar_comando(linea)
+            enviar_comando(construir_cancel_all())
+            auditar("CANCELAR", "todas", "enviada")
             return "Solicitud enviada: cancelar TODAS las ordenes."
-        linea = construir_cancel(args.get("order_id"))
-        enviar_comando(linea)
+        enviar_comando(construir_cancel(args.get("order_id")))
+        auditar("CANCELAR", str(args.get("order_id")), "enviada")
         return f"Solicitud enviada: cancelar la orden {args.get('order_id')}."
     except Exception as e:
+        auditar("CANCELAR", str(args.get("order_id") or "todas"), f"ERROR: {e}")
         return f"No pude cancelar: {e}"
 
 
@@ -321,11 +519,14 @@ def cerrar(args: dict) -> str:
     try:
         if str(args.get("todo", "")).lower() in ("1", "true", "si", "yes") or not _campo(args.get("instrument")):
             enviar_comando(construir_flatten())
+            auditar("CERRAR", "aplanar todo", "enviada")
             return "Solicitud enviada: APLANAR todo (cerrar posiciones y cancelar ordenes)."
-        linea = construir_close(args.get("account"), args.get("instrument"))
-        enviar_comando(linea)
-        return f"Solicitud enviada: cerrar la posicion de {_campo(args.get('instrument')).upper()}."
+        inst = _campo(args.get("instrument")).upper()
+        enviar_comando(construir_close(args.get("account"), args.get("instrument")))
+        auditar("CERRAR", inst, "enviada")
+        return f"Solicitud enviada: cerrar la posicion de {inst}."
     except Exception as e:
+        auditar("CERRAR", _campo(args.get("instrument")).upper() or "todo", f"ERROR: {e}")
         return f"No pude cerrar la posicion: {e}"
 
 
@@ -368,6 +569,22 @@ NT_TOOLS = [
         },
     },
     {
+        "name": "nt_diario",
+        "description": ("Diario de trading: resumen de las ordenes enviadas (cuantas, por accion, "
+                        "por dia y ultimas). Util para repasar tu actividad."),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "nt_historial",
+        "description": ("Muestra las ultimas operaciones que Nexus ha enviado a NinjaTrader "
+                        "(bitacora de auditoria). Opcional 'n' = cuantas mostrar."),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "description": "Cuantas operaciones mostrar (defecto 15)."}},
+            "required": [],
+        },
+    },
+    {
         "name": "nt_orden",
         "description": ("ENVIA una orden REAL a NinjaTrader (mueve dinero). Requiere "
                         "confirmacion del usuario. action: BUY/SELL/BUYTOCOVER/SELLSHORT; "
@@ -381,6 +598,8 @@ NT_TOOLS = [
                 "order_type": {"type": "string", "description": "MARKET (defecto), LIMIT, STOPMARKET o STOPLIMIT."},
                 "limit_price": {"type": "string", "description": "Precio limite (para LIMIT/STOPLIMIT)."},
                 "stop_price": {"type": "string", "description": "Precio stop (para STOPMARKET/STOPLIMIT)."},
+                "stop_loss": {"type": "string", "description": "Opcional: precio de stop-loss de proteccion (crea un OCO)."},
+                "take_profit": {"type": "string", "description": "Opcional: precio de take-profit (crea un OCO)."},
                 "tif": {"type": "string", "description": "DAY (defecto) o GTC."},
                 "account": {"type": "string", "description": "Cuenta (opcional; usa la de por defecto)."},
             },
@@ -418,14 +637,52 @@ NT_TOOLS = [
 # Herramientas de orden (mueven dinero): necesitan confirmacion / off por defecto en web.
 NT_PELIGROSAS = {"nt_orden", "nt_cancelar", "nt_cerrar"}
 # Herramientas de solo lectura (seguras).
-NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion"}
+NT_SEGURAS = {"nt_estado", "nt_precio", "nt_posicion", "nt_historial", "nt_diario"}
 
 # Mapa nombre -> funcion de trabajo (sin confirmacion).
 NT_EJECUTORES = {
     "nt_estado": lambda a: estado(),
     "nt_precio": precio,
     "nt_posicion": posicion,
+    "nt_historial": historial,
+    "nt_diario": diario,
     "nt_orden": colocar_orden,
     "nt_cancelar": cancelar,
     "nt_cerrar": cerrar,
 }
+
+
+# ============================================================
+#  DIAGNOSTICO  (correr:  python nexus_ninjatrader.py)
+# ============================================================
+
+def diagnostico() -> str:
+    """Comprueba la configuracion del puente y devuelve un informe legible. Util para
+    verificar el setup de NinjaTrader antes de operar (o ver el modo simulacion)."""
+    lineas = ["=== Diagnostico del puente NinjaTrader ==="]
+    lineas.append(f"Modo simulacion : {'SI (NEXUS_NT_SIMULAR=1)' if NT_SIMULAR else 'no'}")
+    lineas.append(f"Carpeta         : {NT_FOLDER}")
+    lineas.append(f"  existe?       : {'si' if os.path.isdir(NT_FOLDER) else 'NO'}")
+    lineas.append(f"Cuenta          : {NT_ACCOUNT}")
+    lineas.append(f"Bitacora        : {NT_LOG}")
+    # Prueba de escritura de una orden de PRUEBA (no es una orden real de mercado)
+    try:
+        ruta = enviar_comando("SUBSCRIBE;TEST", NT_FOLDER)
+        lineas.append(f"Escritura OIF   : OK ({os.path.basename(ruta)})")
+        try:
+            os.remove(ruta)
+        except OSError:
+            pass
+    except Exception as e:
+        lineas.append(f"Escritura OIF   : FALLO -> {e}")
+    # Prueba de lectura de precio
+    try:
+        val = leer_precio("ES 12-25", "LAST", espera=1.0)
+        lineas.append(f"Lectura precio  : OK (ES 12-25 = {val})")
+    except Exception as e:
+        lineas.append(f"Lectura precio  : sin dato -> {e}")
+    return "\n".join(lineas)
+
+
+if __name__ == "__main__":
+    print(diagnostico())
