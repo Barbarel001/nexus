@@ -669,6 +669,30 @@ def conversar(messages: list, system_prompt: str = None, tools: list = None,
     return texto.strip(), {"in": tin, "out": tout}
 
 
+MEDIA_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+               "gif": "image/gif", "webp": "image/webp"}
+
+
+def analizar_imagen(image_b64: str, media_type: str = "image/jpeg",
+                    prompt: str = "", model: str = None) -> tuple:
+    """Analiza una imagen con la vision de Claude. Devuelve (texto, usage).
+
+    `image_b64` es la imagen en base64 (sin el prefijo data:). Requiere el backend
+    de Claude (la vision no esta disponible en el modelo local de texto)."""
+    client = anthropic.Anthropic()
+    model = model or MODEL
+    contenido = [
+        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
+        {"type": "text", "text": prompt or "Analiza esta imagen en detalle y dime lo relevante."},
+    ]
+    resp = client.messages.create(model=model, max_tokens=MAX_TOKENS,
+                                  system=construir_system_prompt(),
+                                  messages=[{"role": "user", "content": contenido}])
+    texto = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    usage = {"in": resp.usage.input_tokens, "out": resp.usage.output_tokens} if getattr(resp, "usage", None) else {"in": 0, "out": 0}
+    return texto.strip(), usage
+
+
 # ============================================================
 #  PROGRAMA PRINCIPAL
 # ============================================================

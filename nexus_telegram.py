@@ -110,6 +110,40 @@ def extraer_mensaje(update: dict):
     return chat, texto
 
 
+def extraer_foto(update: dict):
+    """Saca (chat_id, file_id, caption) si el update trae una foto; si no, (None, None, None)."""
+    msg = update.get("message") or update.get("edited_message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    fotos = msg.get("photo") or []
+    if chat is None or not fotos:
+        return None, None, None
+    file_id = fotos[-1].get("file_id")  # la ultima es la de mayor resolucion
+    return chat, file_id, (msg.get("caption") or "")
+
+
+def descargar_archivo(file_id: str) -> bytes:
+    """Descarga un archivo de Telegram por su file_id (getFile + descarga)."""
+    url = _API + "/getFile?" + urllib.parse.urlencode({"file_id": file_id})
+    with urllib.request.urlopen(url, timeout=20) as r:
+        data = json.loads(r.read().decode("utf-8", "replace"))
+    path = data["result"]["file_path"]
+    furl = f"https://api.telegram.org/file/bot{TOKEN}/{path}"
+    with urllib.request.urlopen(furl, timeout=40) as r:
+        return r.read()
+
+
+def analizar_foto(file_id: str, caption: str) -> str:
+    """Descarga una foto de Telegram y la analiza con la vision de Claude."""
+    import base64
+    try:
+        crudo = descargar_archivo(file_id)
+        b64 = base64.b64encode(crudo).decode("ascii")
+        texto, _ = nexus.analizar_imagen(b64, "image/jpeg", caption or "")
+        return texto or "(no pude analizar la imagen)"
+    except Exception as e:
+        return f"No pude analizar la imagen: {e}"
+
+
 # --------------------------- Agente ---------------------------
 
 def _ejecutar_seguro(name: str, args: dict) -> str:
@@ -192,6 +226,14 @@ def run():
             continue
         for u in updates:
             offset = u.get("update_id", offset) + 1
+            # Foto: analisis de imagen (vision)
+            fchat, file_id, caption = extraer_foto(u)
+            if fchat is not None:
+                if not permitido(fchat):
+                    enviar("No estas autorizado para usar este bot.", fchat)
+                    continue
+                enviar(analizar_foto(file_id, caption), fchat)
+                continue
             chat_id, texto = extraer_mensaje(u)
             if chat_id is None:
                 continue

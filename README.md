@@ -47,7 +47,8 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🚨 **Price alerts** | "Avísame si el ES toca 5000": create/list/delete alerts; the web panel polls and fires a **browser notification** when one triggers. |
 | 🛡️ **Bracket orders (OCO)** | `nt_orden` can attach a **stop-loss** and **take-profit**; Nexus sends them as an OCO so one cancels the other. |
 | 🎨 **Theme & PWA** | Light/dark theme + accent color picker; **installable as a PWA** (manifest + service worker) to use Nexus like a native app on your phone. |
-| 🤖 **Telegram bot** | Control Nexus and get notifications from anywhere (no tunnel): chat, tasks, alerts, prices — with a chat-id allowlist. Money-moving tools are disabled over Telegram. |
+| 👁️ **Vision** | Send an image — upload in the web (📎) or a photo on Telegram — and Nexus analyzes it (read charts, screenshots, scanned docs). Uses Claude vision. |
+| 🤖 **Telegram bot** | Control Nexus and get notifications from anywhere (no tunnel): chat, tasks, alerts, prices, **photos** — with a chat-id allowlist. Money-moving tools are disabled over Telegram. |
 | ⏰ **Proactive scheduler** | Watches your price alerts and pushes a Telegram message when one triggers; sends a **morning briefing** (tasks due, alerts, prices) at a time you choose. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |

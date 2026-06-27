@@ -127,8 +127,8 @@
   .hist-tools{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 9px}
 
   form{display:flex;gap:12px;align-items:center;padding:18px 0 24px;border-top:1px solid var(--line)}
-  #mic{display:flex;align-items:center;justify-content:center;width:50px;height:50px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line-2);color:var(--accent);font-size:19px;border-radius:12px;cursor:pointer;transition:.18s}
-  #mic:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
+  #mic,#imgBtn{display:flex;align-items:center;justify-content:center;width:50px;height:50px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line-2);color:var(--accent);font-size:19px;border-radius:12px;cursor:pointer;transition:.18s}
+  #mic:hover,#imgBtn:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
   #mic.rec{color:#fff;background:#e11d48;border-color:#e11d48;animation:micpulse 1.1s ease-in-out infinite}
   @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(225,29,72,.5)}50%{box-shadow:0 0 0 8px rgba(225,29,72,0)}}
   #inp{flex:1;height:50px;background:var(--panel);border:1px solid var(--line-2);color:var(--txt);font-family:inherit;font-size:15px;padding:0 18px;border-radius:12px;outline:none;transition:.18s}
@@ -274,6 +274,8 @@
 
       <form id="form" class="row" autocomplete="off">
         <button id="mic" type="button" title="Hablar a Nexus" aria-label="Hablar">🎤</button>
+        <button id="imgBtn" type="button" title="Analizar una imagen" aria-label="Imagen">📎</button>
+        <input id="imgFile" type="file" accept="image/*" style="display:none" />
         <input id="inp" placeholder="Escribe un mensaje o pulsa el micrófono…" autofocus />
         <button id="send" type="submit">Enviar</button>
       </form>
@@ -654,6 +656,41 @@ form.addEventListener('submit', e => {
   const t = inp.value; inp.value = ''; sendMessage(t, false);
 });
 document.getElementById('new').addEventListener('click', () => { if(!busy){ nuevaConv(); toggleSidebar(false); } });
+
+/* ---------- Visión: analizar imágenes ---------- */
+const imgBtn = document.getElementById('imgBtn'), imgFile = document.getElementById('imgFile');
+imgBtn.addEventListener('click', () => { if(!busy && cid) imgFile.click(); });
+imgFile.addEventListener('change', () => {
+  const f = imgFile.files[0]; imgFile.value = ''; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => enviarImagen(reader.result);
+  reader.readAsDataURL(f);
+});
+async function enviarImagen(dataUrl){
+  if(busy || !cid) return;
+  const prompt = inp.value.trim(); inp.value = '';
+  setBusy(true); stopSpeak();
+  const m = document.createElement('div'); m.className = 'msg me';
+  m.innerHTML = '<div class="who">Tú</div><div class="body"></div>';
+  const body = m.querySelector('.body');
+  const img = document.createElement('img');
+  img.src = dataUrl; img.style.cssText = 'max-width:220px;border-radius:10px;display:block';
+  body.appendChild(img);
+  if(prompt){ const p = document.createElement('div'); p.style.marginTop = '8px'; p.textContent = prompt; body.appendChild(p); }
+  chat.appendChild(m);
+  const node = addNexus(); const nb = node.querySelector('.body');
+  try{
+    const r = await fetch('/api/vision', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({image: dataUrl, prompt: prompt, cid: cid})});
+    const d = await r.json();
+    if(d.ok){
+      try{ nb.innerHTML = marked.parse(d.texto || ''); }catch(_){ nb.textContent = d.texto || ''; }
+      if(d.usage) pintaCosto(node, {in: d.usage.in, out: d.usage.out, modelo: SET.model, costo: d.costo});
+    } else { nb.textContent = '⚠ ' + (d.error || 'no se pudo analizar la imagen'); }
+  }catch(e){ nb.textContent = '⚠ error: ' + e; }
+  adornarAI(node, () => nb.textContent, false);
+  setBusy(false); cargarLista(); scrollEnd();
+}
 
 /* ---------- Modal de confirmación ---------- */
 const confirmBg = document.getElementById('confirmBg');

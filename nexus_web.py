@@ -444,6 +444,41 @@ def confirmar():
     return jsonify({"ok": bool(estado)})
 
 
+@app.route("/api/vision", methods=["POST"])
+def vision_api():
+    """Analiza una imagen con la vision de Claude y la guarda en la conversacion."""
+    body = request.get_json(silent=True) or {}
+    data = (body.get("image") or "").strip()
+    prompt = (body.get("prompt") or "").strip()
+    cid = (body.get("cid") or "").strip()
+    if not data:
+        return jsonify({"ok": False, "error": "falta la imagen"}), 400
+    # Acepta data-URL (data:image/png;base64,XXXX) o base64 puro.
+    media_type = "image/jpeg"
+    if data.startswith("data:"):
+        try:
+            cabecera, data = data.split(",", 1)
+            media_type = cabecera.split(":", 1)[1].split(";", 1)[0] or media_type
+        except (ValueError, IndexError):
+            return jsonify({"ok": False, "error": "imagen invalida"}), 400
+    try:
+        texto, usage = nexus.analizar_imagen(data, media_type, prompt)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    # Persistimos el turno (la imagen no se guarda; sí el prompt y la respuesta).
+    if cid:
+        convs = cargar_convs()
+        conv = buscar_conv(convs, cid)
+        if conv is None:
+            conv = {"id": cid, "titulo": (prompt or "Imagen")[:42], "creado": ahora(), "turnos": []}
+            convs["convs"].insert(0, conv)
+        conv["turnos"].append({"role": "user", "text": "🖼️ " + (prompt or "(imagen)")})
+        conv["turnos"].append({"role": "assistant", "text": texto, "tools": ["vision"]})
+        guardar_convs(convs)
+    costo = round(nexus.costo_estimado(nexus.MODEL, usage.get("in", 0), usage.get("out", 0)), 5)
+    return jsonify({"ok": True, "texto": texto, "usage": usage, "costo": costo})
+
+
 @app.route("/api/stream")
 def stream():
     msg = (request.args.get("msg") or "").strip()

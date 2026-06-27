@@ -32,6 +32,12 @@ def test_extraer_mensaje():
     assert tg.extraer_mensaje({}) == (None, None)
 
 
+def test_extraer_foto():
+    upd = {"message": {"chat": {"id": 7}, "photo": [{"file_id": "a"}, {"file_id": "big"}], "caption": "mira"}}
+    assert tg.extraer_foto(upd) == (7, "big", "mira")
+    assert tg.extraer_foto({"message": {"chat": {"id": 1}, "text": "hola"}}) == (None, None, None)
+
+
 def test_permitido(monkeypatch):
     monkeypatch.setattr(tg, "CHATS_PERMITIDOS", {"123"})
     assert tg.permitido(123) is True
