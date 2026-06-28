@@ -130,6 +130,25 @@ def contar_usuarios() -> int:
         return c.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
 
 
+def listar_usuarios(limite: int = 500) -> list:
+    """Lista usuarios (más recientes primero) para el panel de administración."""
+    init()
+    with _conn() as c:
+        rows = c.execute("SELECT id, email, plan, creado FROM users ORDER BY id DESC LIMIT ?",
+                         (limite,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def stats() -> dict:
+    """Métricas agregadas: total de usuarios y desglose por plan."""
+    init()
+    with _conn() as c:
+        total = c.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+        por_plan = {r["plan"]: r["n"]
+                    for r in c.execute("SELECT plan, COUNT(*) AS n FROM users GROUP BY plan").fetchall()}
+    return {"usuarios": total, "por_plan": por_plan}
+
+
 # --------------------------- Datos por usuario ---------------------------
 
 def guardar_dato(user_id: int, clave: str, valor) -> None:
