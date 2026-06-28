@@ -21,6 +21,10 @@ token.json
 _check_tmp.js
 _confirm_test.py
 
+# Artefactos de build (PyInstaller)
+build/
+dist/
+
 # Basura de Python
 __pycache__/
 *.pyc

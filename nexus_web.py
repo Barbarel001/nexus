@@ -252,7 +252,9 @@ def sse(event: str, data) -> str:
 
 # ---------------- Rutas ----------------
 
-WEBDIR = os.path.join(CARPETA, "web")
+# Carpeta de assets web. Si Nexus corre como .exe (PyInstaller), los archivos van
+# empaquetados bajo sys._MEIPASS; si no, junto a este script.
+WEBDIR = os.path.join(getattr(sys, "_MEIPASS", CARPETA), "web")
 
 
 @app.route("/")
