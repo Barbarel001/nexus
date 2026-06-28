@@ -209,6 +209,29 @@ def test_sin_password_no_pide_login():
     assert c.get("/api/config").status_code == 200
 
 
+def test_landing_publica():
+    c = nexus_web.app.test_client()
+    r = c.get("/landing")
+    assert r.status_code == 200 and b"NEXUS" in r.data
+
+
+def test_setup_status():
+    c = nexus_web.app.test_client()
+    r = c.get("/api/setup-status")
+    assert r.status_code == 200
+    d = r.get_json()
+    for k in ("api_key", "ollama", "ninjatrader", "telegram", "google"):
+        assert k in d
+
+
+def test_landing_publica_con_password(monkeypatch):
+    """La landing y los iconos deben ser accesibles aunque haya login activo."""
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "x")
+    c = nexus_web.app.test_client()
+    assert c.get("/landing").status_code == 200
+    assert c.get("/app").status_code in (301, 302)  # la app sí pide login
+
+
 def test_vision_sin_imagen():
     c = nexus_web.app.test_client()
     r = c.post("/api/vision", json={})

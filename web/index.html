@@ -368,6 +368,19 @@
     </div>
   </div>
 
+  <!-- Modal: onboarding (primer arranque) -->
+  <div class="modal-bg" id="onbBg">
+    <div class="modal">
+      <div class="modal-h">👋 Bienvenido a NEXUS</div>
+      <div class="modal-sub">Esto es lo que puedes conectar. Lo verde ya está listo; lo demás es opcional.</div>
+      <div id="onbList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+      <div class="modal-actions">
+        <button class="m-btn ghost" id="onbSkip">No mostrar más</button>
+        <button class="m-btn" id="onbClose">Entendido</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: gastos (resumen + alta) -->
   <div class="modal-bg" id="gastosBg">
     <div class="modal">
@@ -1161,6 +1174,32 @@ function arrancarPanel(){
   panelTimer = setInterval(() => { if(dashAbierto()) refreshPanel(); }, 20000);  // refresco periódico
 }
 
+/* ---------- Onboarding (primer arranque) ---------- */
+const onbBg = document.getElementById('onbBg');
+const ONB_ITEMS = [
+  {k:'api_key', t:'Chat con Claude', d:'Configura ANTHROPIC_API_KEY (o usa el modo local).'},
+  {k:'ollama', t:'Modo local gratis (Ollama)', d:'Instala Ollama para chatear sin coste.'},
+  {k:'ninjatrader', t:'Trading (NinjaTrader)', d:'Activa el AT Interface, o usa NEXUS_NT_SIMULAR=1.'},
+  {k:'telegram', t:'Bot de Telegram', d:'Define NEXUS_TELEGRAM_TOKEN para controlarlo desde el móvil.'},
+  {k:'google', t:'Google Calendar + Gmail', d:'Opcional: conecta tu cuenta (ver README).'},
+];
+async function mostrarOnboarding(){
+  let st = {};
+  try{ const r = await fetch('/api/setup-status'); if(r.ok) st = await r.json(); }catch(_){ }
+  const cont = document.getElementById('onbList'); cont.innerHTML = '';
+  for(const it of ONB_ITEMS){
+    const ok = !!st[it.k];
+    const row = document.createElement('div'); row.className = 'trow';
+    row.innerHTML = '<span class="prio ' + (ok ? 'media' : 'baja') + '"></span>' +
+      '<div class="tx"><div class="tt">' + (ok ? '✅ ' : '○ ') + esc(it.t) + '</div>' +
+      '<div class="due">' + (ok ? 'Listo' : esc(it.d)) + '</div></div>';
+    cont.appendChild(row);
+  }
+  onbBg.classList.add('show');
+}
+document.getElementById('onbClose').addEventListener('click', () => onbBg.classList.remove('show'));
+document.getElementById('onbSkip').addEventListener('click', () => { localStorage.setItem('nexus_onboarded','1'); onbBg.classList.remove('show'); });
+
 /* ---------- Accesibilidad y atajos de teclado ---------- */
 // aria-label automatico para los botones de icono (mejora lectores de pantalla).
 function aplicarAria(){
@@ -1193,6 +1232,7 @@ if('serviceWorker' in navigator){
   if(convsCache.length){ await abrirConv(convsCache[0].id); }
   else { await nuevaConv(); }
   await cargarLista();
+  if(localStorage.getItem('nexus_onboarded') !== '1'){ mostrarOnboarding(); }
 })();
 </script>
 </body>

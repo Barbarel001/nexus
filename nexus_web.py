@@ -124,7 +124,8 @@ def _guardia_acceso():
     """Si hay NEXUS_PASSWORD, exige login para todo salvo la propia pagina de login."""
     if not NEXUS_PASSWORD:
         return None
-    if request.endpoint == "login" or session.get("auth"):
+    # Endpoints publicos (no requieren login): login, la landing de marketing y los iconos.
+    if request.endpoint in ("login", "landing", "icon192", "icon512", "manifest") or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -255,8 +256,16 @@ WEBDIR = os.path.join(CARPETA, "web")
 
 
 @app.route("/")
+@app.route("/app")
 def index():
     return send_from_directory(WEBDIR, "index.html")
+
+
+@app.route("/landing")
+@app.route("/inicio")
+def landing():
+    """Pagina de marketing (no requiere login)."""
+    return send_from_directory(WEBDIR, "landing.html")
 
 
 # --- PWA: manifest, service worker e iconos (servidos desde la raiz) ---
@@ -286,6 +295,18 @@ def config():
     return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
                     "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
                     "ollama_disponible": nexus_ollama.disponible()})
+
+
+@app.route("/api/setup-status")
+def setup_status():
+    """Qué está configurado, para el asistente de onboarding."""
+    return jsonify({
+        "api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "ollama": nexus_ollama.disponible(),
+        "ninjatrader": nt.carpeta_ok(),
+        "telegram": bool(nexus._env("NEXUS_TELEGRAM_TOKEN", "")),
+        "google": google.configurado(),
+    })
 
 
 @app.route("/api/panel")
