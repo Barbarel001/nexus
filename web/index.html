@@ -285,7 +285,12 @@
     <aside class="dash" id="dash">
       <div class="dash-head">
         <span class="logo-sm">PANEL</span>
-        <button class="btn-ic" id="dashRefresh" title="Actualizar" style="margin-left:auto;min-width:32px;height:30px">↻</button>
+        <span style="margin-left:auto;display:flex;gap:5px">
+          <button class="btn-ic" id="newsBtn" title="Noticias de mercado" style="min-width:32px;height:30px">📰</button>
+          <button class="btn-ic" id="climaBtn" title="Clima" style="min-width:32px;height:30px">🌤️</button>
+          <button class="btn-ic" id="gastosBtn" title="Gastos del mes" style="min-width:32px;height:30px">💸</button>
+          <button class="btn-ic" id="dashRefresh" title="Actualizar" style="min-width:32px;height:30px">↻</button>
+        </span>
         <button class="x" id="dashClose" title="Cerrar">×</button>
       </div>
 
@@ -977,14 +982,27 @@ document.getElementById('memInp').addEventListener('keydown', e => { if(e.key ==
 /* Diario de trading */
 const infoBg = document.getElementById('infoBg');
 document.getElementById('infoClose').addEventListener('click', () => infoBg.classList.remove('show'));
-document.getElementById('diarioBtn').addEventListener('click', async () => {
-  document.getElementById('infoTitle').textContent = '📒 Diario de trading';
+document.getElementById('diarioBtn').addEventListener('click', () => mostrarInfo('📒 Diario de trading', '/api/diario'));
+
+/* Info genérica en modal: noticias, clima, gastos, diario */
+async function mostrarInfo(titulo, url){
+  document.getElementById('infoTitle').textContent = titulo;
   document.getElementById('infoBody').textContent = 'Cargando…';
   infoBg.classList.add('show');
   try{
-    const r = await fetch('/api/diario'); const d = await r.json();
+    const r = await fetch(url); const d = await r.json();
     document.getElementById('infoBody').textContent = d.texto || '(sin datos)';
-  }catch(_){ document.getElementById('infoBody').textContent = 'No se pudo cargar el diario.'; }
+  }catch(_){ document.getElementById('infoBody').textContent = 'No se pudo cargar.'; }
+}
+document.getElementById('newsBtn').addEventListener('click', () => mostrarInfo('📰 Noticias de mercado', '/api/noticias'));
+document.getElementById('gastosBtn').addEventListener('click', () => mostrarInfo('💸 Gastos del mes', '/api/gastos'));
+document.getElementById('climaBtn').addEventListener('click', () => {
+  let ciudad = localStorage.getItem('nexus_ciudad') || '';
+  const ingresada = prompt('¿De qué ciudad quieres el clima?', ciudad);
+  if(ingresada === null) return;
+  ciudad = ingresada.trim();
+  if(ciudad) localStorage.setItem('nexus_ciudad', ciudad);
+  mostrarInfo('🌤️ Clima', '/api/clima?ciudad=' + encodeURIComponent(ciudad));
 });
 async function refreshPrecios(){
   const rows = document.querySelectorAll('#watch .wrow');

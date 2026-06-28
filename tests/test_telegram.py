@@ -64,6 +64,19 @@ def test_comandos_basicos(tmp_path, monkeypatch):
     assert "una tarea" in tg._manejar(1, "/tareas")
 
 
+def test_help_lista_comandos_nuevos():
+    ayuda = tg._manejar(1, "/help")
+    for c in ("/clima", "/noticias", "/gastos", "/agenda", "/correos"):
+        assert c in ayuda
+
+
+def test_comando_clima_con_argumento(monkeypatch):
+    capt = {}
+    monkeypatch.setattr(tg, "_ejecutar_seguro", lambda n, a: capt.setdefault(n, a) or "ok")
+    tg._manejar(1, "/clima Madrid")
+    assert capt["clima"]["ciudad"] == "Madrid"
+
+
 # --------------------------- Scheduler: logica pura ---------------------------
 
 def test_parse_hora():

@@ -157,6 +157,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_RISK_MAX_QTY` | `0` | Risk rule: max quantity per order (`0` = no limit). Orders over it are blocked before sending |
 | `NEXUS_RISK_MAX_ORDENES` | `0` | Risk rule: max orders per day (`0` = no limit) |
 | `NEXUS_RISK_INSTRUMENTOS` | *(all)* | Risk rule: comma-separated allowlist of tradable instruments |
+| `NEXUS_MEMORIA_PATH` | `memoria.json` | Where long-term memory is stored (git-ignored) |
 | `NEXUS_TAREAS_PATH` | `tareas.json` | Where tasks & reminders are stored (git-ignored) |
 | `NEXUS_ALERTAS_PATH` | `alertas.json` | Where price alerts are stored (git-ignored) |
 | `NEXUS_NT_LOG` | `nexus_trades.log` | Trade audit log file (git-ignored) |
