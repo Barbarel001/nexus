@@ -50,6 +50,8 @@ import nexus_noticias as noticias  # titulares de mercado
 import nexus_gastos as gastos  # control de gastos
 import nexus_clima as clima  # clima
 import nexus_google as google  # Google Calendar + Gmail
+import nexus_backtest as backtest  # backtesting
+import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -60,7 +62,7 @@ SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
             "read_file", "list_directory"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -91,6 +93,13 @@ app = Flask(__name__, static_folder=None)
 # Si defines NEXUS_PASSWORD, Nexus pide login antes de dar acceso. Sin esa variable,
 # no hay login (uso local de siempre). Pensado para abrirlo por un tunel publico.
 NEXUS_PASSWORD = nexus._env("NEXUS_PASSWORD", "")
+# Modo MULTIUSUARIO (SaaS): NEXUS_MULTIUSER=1 activa cuentas (registro/login con
+# email+contraseña) sobre SQLite. Si esta off, se usa el modo de una sola
+# contraseña (NEXUS_PASSWORD) o ninguno (uso local). Opt-in para no romper nada.
+import nexus_db
+NEXUS_MULTIUSER = nexus._env("NEXUS_MULTIUSER", "0").lower() in ("1", "true", "yes", "on")
+if NEXUS_MULTIUSER:
+    nexus_db.init()
 app.secret_key = nexus._env("NEXUS_SECRET", "") or os.urandom(24)
 app.permanent_session_lifetime = datetime.timedelta(days=30)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
@@ -118,13 +127,32 @@ LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
  </form>
 </body></html>"""
 
+# Pagina de login/registro para el modo multiusuario (email + contraseña).
+MULTIUSER_LOGIN_HTML = LOGIN_HTML.replace(
+    '<div class="sub">Acceso privado</div>',
+    '<div class="sub">{{ modo_sub }}</div>'
+).replace(
+    '<input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">\n   <button type="submit">Entrar</button>',
+    '<input type="email" name="email" placeholder="Email" autofocus autocomplete="email">\n'
+    '   <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password">\n'
+    '   <button type="submit" formaction="/login">Entrar</button>\n'
+    '   <div style="text-align:center;margin-top:12px;font-size:13px;color:#94a6bd">¿Sin cuenta?</div>\n'
+    '   <button type="submit" formaction="/register" style="background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3);margin-top:8px">Crear cuenta</button>'
+)
+
+
+def _auth_requerida() -> bool:
+    return bool(NEXUS_MULTIUSER or NEXUS_PASSWORD)
+
 
 @app.before_request
 def _guardia_acceso():
-    """Si hay NEXUS_PASSWORD, exige login para todo salvo la propia pagina de login."""
-    if not NEXUS_PASSWORD:
+    """Exige login si hay multiusuario o NEXUS_PASSWORD. La landing y los iconos
+    son publicos."""
+    if not _auth_requerida():
         return None
-    if request.endpoint == "login" or session.get("auth"):
+    if request.endpoint in ("login", "register", "landing", "icon192", "icon512", "manifest") \
+            or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -133,9 +161,21 @@ def _guardia_acceso():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if not NEXUS_PASSWORD:
+    if not _auth_requerida():
         return redirect("/")
     error = ""
+    if NEXUS_MULTIUSER:
+        if request.method == "POST":
+            u = nexus_db.autenticar(request.form.get("email", ""), request.form.get("password", ""))
+            if u:
+                session["auth"] = True
+                session["user_id"] = u["id"]
+                session["email"] = u["email"]
+                session.permanent = True
+                return redirect("/")
+            error = "Email o contraseña incorrectos."
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=error, modo_sub="Inicia sesión")
+    # Modo de una sola contraseña.
     if request.method == "POST":
         if hmac.compare_digest(request.form.get("password", ""), NEXUS_PASSWORD):
             session["auth"] = True
@@ -143,6 +183,21 @@ def login():
             return redirect("/")
         error = "Contraseña incorrecta."
     return render_template_string(LOGIN_HTML, error=error)
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    if not NEXUS_MULTIUSER:
+        return redirect("/login")
+    try:
+        u = nexus_db.crear_usuario(request.form.get("email", ""), request.form.get("password", ""))
+    except ValueError as e:
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=str(e), modo_sub="Crear cuenta")
+    session["auth"] = True
+    session["user_id"] = u["id"]
+    session["email"] = u["email"]
+    session.permanent = True
+    return redirect("/")
 
 
 @app.route("/logout")
@@ -251,12 +306,22 @@ def sse(event: str, data) -> str:
 
 # ---------------- Rutas ----------------
 
-WEBDIR = os.path.join(CARPETA, "web")
+# Carpeta de assets web. Si Nexus corre como .exe (PyInstaller), los archivos van
+# empaquetados bajo sys._MEIPASS; si no, junto a este script.
+WEBDIR = os.path.join(getattr(sys, "_MEIPASS", CARPETA), "web")
 
 
 @app.route("/")
+@app.route("/app")
 def index():
     return send_from_directory(WEBDIR, "index.html")
+
+
+@app.route("/landing")
+@app.route("/inicio")
+def landing():
+    """Pagina de marketing (no requiere login)."""
+    return send_from_directory(WEBDIR, "landing.html")
 
 
 # --- PWA: manifest, service worker e iconos (servidos desde la raiz) ---
@@ -286,6 +351,30 @@ def config():
     return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
                     "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
                     "ollama_disponible": nexus_ollama.disponible()})
+
+
+@app.route("/api/checkout")
+def checkout_api():
+    """Crea una sesión de pago (Stripe) para un plan y devuelve la URL de Checkout."""
+    plan = request.args.get("plan", "pro")
+    email = session.get("email", "") if NEXUS_MULTIUSER else ""
+    try:
+        url = pagos.crear_checkout(plan, email)
+    except (ValueError, RuntimeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "url": url})
+
+
+@app.route("/api/setup-status")
+def setup_status():
+    """Qué está configurado, para el asistente de onboarding."""
+    return jsonify({
+        "api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "ollama": nexus_ollama.disponible(),
+        "ninjatrader": nt.carpeta_ok(),
+        "telegram": bool(nexus._env("NEXUS_TELEGRAM_TOKEN", "")),
+        "google": google.configurado(),
+    })
 
 
 @app.route("/api/panel")

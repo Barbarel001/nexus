@@ -6,6 +6,8 @@ alertas.json
 gastos.json
 nexus_trades.log
 *.log
+nexus.db
+nexus.db-journal
 nexus_nt_sim/
 documentos/
 backups/
@@ -20,6 +22,10 @@ token.json
 .claude/
 _check_tmp.js
 _confirm_test.py
+
+# Artefactos de build (PyInstaller)
+build/
+dist/
 
 # Basura de Python
 __pycache__/

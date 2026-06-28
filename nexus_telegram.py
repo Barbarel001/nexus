@@ -40,6 +40,7 @@ import nexus_noticias as noticias
 import nexus_gastos as gastos
 import nexus_clima as clima
 import nexus_google as google
+import nexus_backtest as backtest
 
 TOKEN = nexus._env("NEXUS_TELEGRAM_TOKEN", "")
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -53,7 +54,7 @@ SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
             "read_file", "list_directory"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
 
 # Historial de conversacion por chat (en memoria; se reinicia con /nuevo).
 _historiales = {}
