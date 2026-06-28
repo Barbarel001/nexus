@@ -227,6 +227,19 @@ def test_wsgi_expone_app():
     assert wsgi.app is nexus_web.app
 
 
+def test_health_publico():
+    c = nexus_web.app.test_client()
+    for ruta in ("/api/health", "/healthz"):
+        r = c.get(ruta)
+        assert r.status_code == 200 and r.get_json()["ok"] is True
+
+
+def test_health_publico_con_password(monkeypatch):
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "x")
+    c = nexus_web.app.test_client()
+    assert c.get("/api/health").status_code == 200   # health no requiere login
+
+
 def test_setup_status():
     c = nexus_web.app.test_client()
     r = c.get("/api/setup-status")

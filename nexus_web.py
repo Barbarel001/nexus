@@ -152,7 +152,7 @@ def _guardia_acceso():
     if not _auth_requerida():
         return None
     if request.endpoint in ("login", "register", "landing", "landing_en", "stripe_webhook",
-                            "icon192", "icon512", "manifest") or session.get("auth"):
+                            "health", "icon192", "icon512", "manifest") or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -370,6 +370,13 @@ def checkout_api():
     except (ValueError, RuntimeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "url": url})
+
+
+@app.route("/api/health")
+@app.route("/healthz")
+def health():
+    """Endpoint de salud para balanceadores/monitores de uptime (publico)."""
+    return jsonify({"ok": True, "service": "nexus", "multiuser": NEXUS_MULTIUSER})
 
 
 @app.route("/api/stripe/webhook", methods=["POST"])
