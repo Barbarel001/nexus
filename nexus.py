@@ -43,6 +43,7 @@ import nexus_noticias as noticias  # titulares de mercado (RSS)
 import nexus_gastos as gastos  # control de gastos personales
 import nexus_clima as clima  # clima (Open-Meteo, gratis)
 import nexus_google as google  # Google Calendar + Gmail (opcional)
+import nexus_backtest as backtest  # backtesting de estrategias
 
 
 # ============================================================
@@ -127,6 +128,7 @@ Tienes herramientas REALES. Usalas cuando de verdad ayuden:
 - noticias_mercado: ultimos titulares de noticias de mercados financieros.
 - agregar_gasto / resumen_gastos / eliminar_gasto: control de gastos personales por mes y categoria.
 - clima: tiempo actual y pronostico del dia de una ciudad.
+- backtest: prueba una estrategia de cruce de medias sobre una serie de precios.
 - google_agenda / google_correos: ver tu Google Calendar y Gmail (si esta configurado).
 - google_crear_evento / google_enviar_correo: crear eventos o enviar correos (pide confirmacion).
 
@@ -373,6 +375,7 @@ TOOLS += noticias.NEWS_TOOLS
 TOOLS += gastos.GASTOS_TOOLS
 TOOLS += clima.CLIMA_TOOLS
 TOOLS += google.GOOGLE_TOOLS
+TOOLS += backtest.BACKTEST_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero, tocan el
 # sistema o hacen acciones externas): piden confirmacion en la terminal y van detras
@@ -636,6 +639,7 @@ EJECUTORES.update(docs.DOCS_EJECUTORES)
 EJECUTORES.update(noticias.NEWS_EJECUTORES)
 EJECUTORES.update(gastos.GASTOS_EJECUTORES)
 EJECUTORES.update(clima.CLIMA_EJECUTORES)
+EJECUTORES.update(backtest.BACKTEST_EJECUTORES)
 # Google: lectura directa; acciones (crear evento / enviar correo) con confirmacion.
 EJECUTORES.update({
     "google_agenda": google.GOOGLE_EJECUTORES["google_agenda"],

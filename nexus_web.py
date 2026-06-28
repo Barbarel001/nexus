@@ -50,6 +50,8 @@ import nexus_noticias as noticias  # titulares de mercado
 import nexus_gastos as gastos  # control de gastos
 import nexus_clima as clima  # clima
 import nexus_google as google  # Google Calendar + Gmail
+import nexus_backtest as backtest  # backtesting
+import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -60,7 +62,7 @@ SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
             "read_file", "list_directory"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -349,6 +351,18 @@ def config():
     return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
                     "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
                     "ollama_disponible": nexus_ollama.disponible()})
+
+
+@app.route("/api/checkout")
+def checkout_api():
+    """Crea una sesión de pago (Stripe) para un plan y devuelve la URL de Checkout."""
+    plan = request.args.get("plan", "pro")
+    email = session.get("email", "") if NEXUS_MULTIUSER else ""
+    try:
+        url = pagos.crear_checkout(plan, email)
+    except (ValueError, RuntimeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "url": url})
 
 
 @app.route("/api/setup-status")

@@ -55,6 +55,8 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 🌤️ **Weather** | Current weather + day forecast for any city via Open-Meteo (free, no key); also in the morning briefing. |
 | 💬 **Discord notifications** | Optionally mirror alerts and the briefing to a Discord channel via webhook. |
 | 📅 **Google (Calendar + Gmail)** | See your agenda, create events, read recent emails and send mail (optional; OAuth). Write actions require confirmation. |
+| 📊 **Backtesting** | Test a moving-average crossover strategy over a price series (`backtest`): trades, win rate, cumulative return. Educational, not advice. |
+| 🛒 **Productization** | Marketing **landing page** (`/landing`), first-run **onboarding**, optional **multi-user accounts** (SQLite), **Stripe** checkout scaffold, and a **one-click Windows build**. |
 | 🎙️ **Voice** | Text-to-speech (reads answers aloud) and speech-to-text (dictate by mic) via the Web Speech API. |
 | 💸 **Cost meter** | Tokens used and estimated USD cost per turn (terminal and web), via a per-model price table. |
 | 🎛️ **Model & settings** | Pick the model (Opus / Sonnet / Haiku) and set your name and default voice from an in-app settings panel. |
@@ -149,6 +151,9 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_SECRET` | *(random)* | Secret key for signing the login session cookie. Set a fixed value to stay logged in across restarts |
 | `NEXUS_MULTIUSER` | `0` | `1` enables multi-user accounts (register/login with email+password over SQLite) — the basis for a hosted/SaaS deployment |
 | `NEXUS_DB_PATH` | `nexus.db` | SQLite database file for user accounts (git-ignored) |
+| `NEXUS_STRIPE_KEY` | *(none)* | Stripe secret key — enables subscription checkout (`pip install stripe`) |
+| `NEXUS_STRIPE_PRICE_PRO` / `_TEAM` | *(none)* | Stripe price IDs for the Pro / Team plans |
+| `NEXUS_BASE_URL` | `http://localhost:5000` | Public base URL used for Stripe return links |
 | `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
 | `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
@@ -338,6 +343,21 @@ pytest
 ```
 
 CI runs the full suite on every push via GitHub Actions.
+
+## Selling Nexus (productization)
+
+Groundwork for turning Nexus into a product is included:
+
+- **Landing page** at `/landing` (marketing + pricing) and a **first-run onboarding** wizard.
+- **Multi-user accounts** over SQLite (`NEXUS_MULTIUSER=1`) — basis for a hosted SaaS.
+- **Stripe checkout** scaffold (`nexus_pagos.py`) — add your keys/price IDs to charge.
+- **One-click Windows build** (`build_installer.bat` + `nexus.spec`) — see `INSTALL.md`.
+- **Legal**: `DISCLAIMER.md`, `TERMS.md`, `PRIVACY.md` templates.
+
+**What still needs *your* accounts/decisions** (can't be tested here): real Stripe keys,
+a hosting/domain for SaaS, code-signing for the installer, additional broker
+integrations (Interactive Brokers, Tradovate…), a native mobile app (the PWA is the
+bridge), and choosing a license (currently MIT — pick before commercializing).
 
 ## Legal
 
