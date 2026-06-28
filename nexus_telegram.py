@@ -50,8 +50,8 @@ _ids = [s.strip() for s in nexus._env("NEXUS_TELEGRAM_CHAT_ID", "").replace(";",
 CHATS_PERMITIDOS = set(_ids)
 
 # Herramientas SEGURAS disponibles por Telegram (no mueven dinero).
-SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
-            "read_file", "list_directory"}
+# read_file / list_directory NO se exponen por Telegram (lectura de archivos del servidor).
+SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
            | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
