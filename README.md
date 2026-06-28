@@ -337,6 +337,14 @@ pytest
 
 CI runs the full suite on every push via GitHub Actions.
 
+## Legal
+
+Nexus is **not a financial advisor** and does not provide investment advice — see
+[`DISCLAIMER.md`](DISCLAIMER.md). Trading involves risk; test in **simulation/paper
+mode** first, and every order is your own decision. Template
+[`TERMS.md`](TERMS.md) and [`PRIVACY.md`](PRIVACY.md) are included as a starting
+point if you distribute Nexus (adapt them with legal advice).
+
 ## Security
 
 Nexus can run commands and write files on your machine, so it **asks for confirmation**
