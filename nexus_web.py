@@ -41,6 +41,7 @@ except ImportError:
 
 import anthropic
 import nexus_util  # escritura atomica / logging
+import nexus_ctx  # contexto de usuario (aislamiento de datos)
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
@@ -191,6 +192,19 @@ def _guardia_acceso():
     return redirect("/login")
 
 
+@app.before_request
+def _fijar_contexto_usuario():
+    """En multiusuario, fija el usuario de la sesión para aislar sus datos."""
+    nexus_ctx.clear_user()
+    if NEXUS_MULTIUSER and session.get("user_id"):
+        nexus_ctx.set_user(session["user_id"])
+
+
+@app.teardown_request
+def _limpiar_contexto_usuario(exc):
+    nexus_ctx.clear_user()
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if not _auth_requerida():
@@ -252,15 +266,11 @@ _lock = threading.Lock()
 # ---------------- Persistencia de conversaciones ----------------
 
 def cargar_convs() -> dict:
-    try:
-        with open(CONV_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"convs": []}
+    return nexus_util.cargar_json(nexus_ctx.user_path(CONV_PATH), {"convs": []}) or {"convs": []}
 
 
 def guardar_convs(data: dict) -> None:
-    nexus_util.guardar_json(CONV_PATH, data)
+    nexus_util.guardar_json(nexus_ctx.user_path(CONV_PATH), data)
 
 
 def buscar_conv(data: dict, cid: str):

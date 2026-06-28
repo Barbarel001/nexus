@@ -18,8 +18,15 @@ import os
 import re
 import glob
 
+import nexus_ctx
+
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 DOCS_DIR = os.environ.get("NEXUS_DOCS_DIR") or os.path.join(_CARPETA, "documentos")
+
+
+def _docs_dir() -> str:
+    """Carpeta de documentos del usuario en curso (o la global)."""
+    return nexus_ctx.user_dir(DOCS_DIR)
 
 _PALABRA = re.compile(r"[\wáéíóúüñ]+", re.IGNORECASE)
 # Palabras vacias comunes (es/en) que no aportan a la relevancia.
@@ -73,7 +80,7 @@ def _trozos(texto: str, tam: int = 600):
 
 def indexar(carpeta: str = None) -> list:
     """Lee la carpeta y devuelve una lista de fragmentos: {archivo, texto, tokens}."""
-    carpeta = carpeta or DOCS_DIR
+    carpeta = carpeta or _docs_dir()
     if not os.path.isdir(carpeta):
         return []
     frags = []
@@ -114,8 +121,8 @@ def tool_buscar_documentos(args: dict) -> str:
     consulta = (args.get("consulta") or "").strip()
     if not consulta:
         return "Indica que quieres buscar en tus documentos."
-    if not os.path.isdir(DOCS_DIR):
-        return (f"No hay carpeta de documentos en {DOCS_DIR}. Crea la carpeta y pon ahi "
+    if not os.path.isdir(_docs_dir()):
+        return (f"No hay carpeta de documentos en {_docs_dir()}. Crea la carpeta y pon ahi "
                 "tus .txt, .md o .pdf para que pueda consultarlos.")
     hits = buscar(consulta)
     if not hits:

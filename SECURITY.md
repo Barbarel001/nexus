@@ -22,11 +22,10 @@ Antes de abrirlo a terceros:
 - **Webhook de Stripe** con verificación de firma. ✅
 
 ## ⚠️ Limitaciones conocidas (TODO antes de SaaS público)
-1. **Aislamiento de datos por usuario:** las cuentas (login) funcionan, pero los datos
-   de funciones (tareas, memoria, gastos, conversaciones) aún se guardan en archivos
-   **globales**, no por usuario. **No abras el modo multiusuario a terceros** hasta
-   enrutar cada almacenamiento por `user_id` (la BD ya tiene `user_data` por usuario
-   como base). Es el trabajo #1 pendiente para SaaS real.
+1. **Aislamiento de datos por usuario:** ✅ RESUELTO. En modo multiusuario, cada
+   usuario guarda sus datos (memoria, tareas, alertas, gastos, conversaciones,
+   documentos) en su propia carpeta `data/users/<id>/` (`nexus_ctx`). Un usuario no
+   puede ver los datos de otro.
 2. **CSRF tokens:** se confía en `SameSite=Lax` (mitiga la mayoría de casos). Para SaaS,
    añadir tokens CSRF a las acciones POST.
 3. **2FA:** no implementado.

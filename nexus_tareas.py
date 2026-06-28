@@ -22,6 +22,7 @@ import uuid
 import datetime
 
 import nexus_util
+import nexus_ctx
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 TAREAS_PATH = os.environ.get("NEXUS_TAREAS_PATH") or os.path.join(CARPETA, "tareas.json")
@@ -33,15 +34,11 @@ _MARCA = {"alta": "[!]", "media": "[-]", "baja": "[.]"}
 # --------------------------- Persistencia ---------------------------
 
 def cargar() -> list:
-    try:
-        with open(TAREAS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f).get("tareas", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    return (nexus_util.cargar_json(nexus_ctx.user_path(TAREAS_PATH), {"tareas": []}) or {}).get("tareas", [])
 
 
 def guardar(tareas: list) -> None:
-    nexus_util.guardar_json(TAREAS_PATH, {"tareas": tareas})
+    nexus_util.guardar_json(nexus_ctx.user_path(TAREAS_PATH), {"tareas": tareas})
 
 
 def _hoy() -> datetime.date:

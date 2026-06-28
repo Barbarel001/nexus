@@ -35,6 +35,7 @@ except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
 import nexus_util  # utilidades base (escritura atomica, logging)
+import nexus_ctx  # contexto de usuario (aislamiento de datos multiusuario)
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
 import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
@@ -168,7 +169,7 @@ def _normalizar_nota(item) -> dict:
 
 def cargar_notas() -> list:
     """Memoria completa como lista de objetos {id, texto, categoria, creada}."""
-    crudas = (nexus_util.cargar_json(MEMORIA_PATH, {"notas": []}) or {}).get("notas", [])
+    crudas = (nexus_util.cargar_json(nexus_ctx.user_path(MEMORIA_PATH), {"notas": []}) or {}).get("notas", [])
     return [n for n in (_normalizar_nota(x) for x in crudas) if n["texto"]]
 
 
@@ -178,7 +179,7 @@ def cargar_memoria() -> list:
 
 
 def _guardar_notas(notas: list) -> None:
-    nexus_util.guardar_json(MEMORIA_PATH, {"notas": notas})
+    nexus_util.guardar_json(nexus_ctx.user_path(MEMORIA_PATH), {"notas": notas})
 
 
 def guardar_nota(nota: str, categoria: str = "general") -> bool:

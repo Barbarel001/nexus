@@ -353,7 +353,9 @@ CI runs the full suite on every push via GitHub Actions.
 Groundwork for turning Nexus into a product is included:
 
 - **Landing page** at `/landing` (marketing + pricing) and a **first-run onboarding** wizard.
-- **Multi-user accounts** over SQLite (`NEXUS_MULTIUSER=1`) — basis for a hosted SaaS.
+- **Multi-user accounts** over SQLite (`NEXUS_MULTIUSER=1`) with **per-user data
+  isolation** (each user's memory, tasks, alerts, expenses, conversations and docs
+  live in their own `data/users/<id>/` folder) — ready for a hosted SaaS.
 - **Stripe checkout** scaffold (`nexus_pagos.py`) — add your keys/price IDs to charge.
 - **One-click Windows build** (`build_installer.bat` + `nexus.spec`) — see `INSTALL.md`.
 - **Legal**: `DISCLAIMER.md`, `TERMS.md`, `PRIVACY.md` templates.
