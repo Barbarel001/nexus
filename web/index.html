@@ -590,7 +590,7 @@ function sendMessage(text, porVoz, opts){
   setBusy(true);
   if(!opts.skipEcho) pinta('user', text);
   const node = addNexus(); const body = node.querySelector('.body');
-  let raw = '', started = false, usage = null;
+  let raw = '', started = false, usage = null, errMsg = null;
 
   let url = '/api/stream?cid=' + cid + '&msg=' + encodeURIComponent(text)
           + '&model=' + encodeURIComponent(SET.model);
@@ -613,12 +613,13 @@ function sendMessage(text, porVoz, opts){
   });
   es.addEventListener('confirm', e => { pedirConfirmacion(JSON.parse(e.data)); });
   es.addEventListener('usage', e => { try{ usage = JSON.parse(e.data); }catch(_){ } });
-  es.addEventListener('error', e => { try{ body.textContent = '⚠ ' + JSON.parse(e.data).msg; }catch(_){ } });
+  es.addEventListener('error', e => { try{ errMsg = JSON.parse(e.data).msg; body.textContent = '⚠ ' + errMsg; }catch(_){ } });
 
   const finish = (ev, detenido) => {
     es.close(); currentES = null; currentFinish = null;
     node.querySelector('.status-line').innerHTML = '';
     if(raw){ try{ body.innerHTML = marked.parse(raw); }catch(_){ body.textContent = raw; } }
+    else if(errMsg){ body.textContent = '⚠ ' + errMsg; }   // muestra el error real, no lo tapa
     else if(!started){ body.textContent = detenido ? '(detenido)' : '(sin respuesta)'; }
     if(usage){ pintaCosto(node, usage); }
     adornarAI(node, () => raw, true);
@@ -628,7 +629,12 @@ function sendMessage(text, porVoz, opts){
   };
   currentFinish = finish;
   es.addEventListener('done', finish);
-  es.onerror = () => { if(busy) finish(null, false); };
+  es.onerror = () => {
+    if(busy){
+      if(!started && !raw && !errMsg){ errMsg = 'Se perdió la conexión con el servidor (¿reinició Nexus o falta la API key?).'; }
+      finish(null, false);
+    }
+  };
 }
 
 function pintaCosto(node, u){
