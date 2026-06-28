@@ -348,6 +348,18 @@ def gastos_api():
     return jsonify({"texto": gastos.tool_resumen_gastos({"mes": request.args.get("mes", "")})})
 
 
+@app.route("/api/gasto/agregar", methods=["POST"])
+def gasto_agregar_api():
+    """Registra un gasto desde el panel."""
+    body = request.get_json(silent=True) or {}
+    try:
+        g = gastos.agregar(body.get("monto"), body.get("categoria", "general"),
+                           body.get("descripcion", ""))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "gasto": g})
+
+
 @app.route("/api/nt/precio")
 def nt_precio_api():
     """Precio de un instrumento via NinjaTrader (para la watchlist del panel)."""
@@ -576,18 +588,32 @@ def stream():
 
         # ---- Backend Claude (API de Anthropic) ----
         client = anthropic.Anthropic()
+        # Si la cuenta/modelo no admite funciones avanzadas (thinking adaptativo o la
+        # busqueda web del servidor), reintentamos automaticamente en "modo compatible"
+        # (sin thinking y sin web_search) en vez de fallar con un error.
+        degradado = False
         try:
             for _ in range(10):
+                tools_actuales = TOOLS_WEB if not degradado else [
+                    t for t in TOOLS_WEB if not str(t.get("type", "")).startswith("web_search")]
                 _kw = dict(model=model, max_tokens=nexus.MAX_TOKENS, system=system_prompt,
-                           tools=TOOLS_WEB, messages=api_messages)
-                _th = nexus.thinking_para(model)
+                           tools=tools_actuales, messages=api_messages)
+                _th = None if degradado else nexus.thinking_para(model)
                 if _th:
                     _kw["thinking"] = _th
-                with client.messages.stream(**_kw) as s:
-                    for texto in s.text_stream:
-                        texto_final += texto
-                        yield sse("delta", {"text": texto})
-                    final = s.get_final_message()
+                try:
+                    with client.messages.stream(**_kw) as s:
+                        for texto in s.text_stream:
+                            texto_final += texto
+                            yield sse("delta", {"text": texto})
+                        final = s.get_final_message()
+                except Exception as e:
+                    # Solo reintentamos si aun no hay texto (error de validacion inicial).
+                    if not degradado and not texto_final:
+                        degradado = True
+                        nexus_util.log(f"Claude: reintentando en modo compatible ({e})", "WARN")
+                        continue
+                    raise
 
                 if getattr(final, "usage", None):
                     tin += final.usage.input_tokens

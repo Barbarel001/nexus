@@ -672,13 +672,22 @@ def conversar(messages: list, system_prompt: str = None, tools: list = None,
     model = model or MODEL
     texto = ""
     tin = tout = 0
+    degradado = False  # modo compatible: sin thinking ni web_search si la cuenta no los admite
     for _ in range(max_iter):
+        tools_actuales = tools if not degradado else [
+            t for t in tools if not str(t.get("type", "")).startswith("web_search")]
         kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system_prompt,
-                      tools=tools, messages=messages)
-        _th = thinking_para(model)
+                      tools=tools_actuales, messages=messages)
+        _th = None if degradado else thinking_para(model)
         if _th:
             kwargs["thinking"] = _th
-        resp = client.messages.create(**kwargs)
+        try:
+            resp = client.messages.create(**kwargs)
+        except Exception:
+            if not degradado and not texto:
+                degradado = True
+                continue  # reintenta en modo compatible
+            raise
         if getattr(resp, "usage", None):
             tin += resp.usage.input_tokens
             tout += resp.usage.output_tokens

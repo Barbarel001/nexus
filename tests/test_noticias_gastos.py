@@ -98,6 +98,17 @@ def test_api_gastos_endpoint():
     assert r.status_code == 200 and "comida" in r.get_json()["texto"]
 
 
+def test_api_gasto_agregar_endpoint():
+    import nexus_web
+    c = nexus_web.app.test_client()
+    r = c.post("/api/gasto/agregar", json={"monto": 9.99, "categoria": "ocio", "descripcion": "app"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert any(g["categoria"] == "ocio" for g in gastos.cargar())
+    # monto invalido -> 400
+    r2 = c.post("/api/gasto/agregar", json={"monto": "gratis"})
+    assert r2.status_code == 400
+
+
 def test_api_noticias_endpoint(monkeypatch):
     import nexus_web
     monkeypatch.setattr(noticias, "obtener", lambda *a, **k: [{"titulo": "Titular X", "url": "http://x"}])

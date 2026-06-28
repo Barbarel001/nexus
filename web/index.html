@@ -362,6 +362,21 @@
     </div>
   </div>
 
+  <!-- Modal: gastos (resumen + alta) -->
+  <div class="modal-bg" id="gastosBg">
+    <div class="modal">
+      <div class="modal-h">💸 Gastos del mes</div>
+      <pre class="modal-pre" id="gastosBody"></pre>
+      <div class="add-row">
+        <input id="gMonto" placeholder="Monto" inputmode="decimal" style="max-width:90px" />
+        <input id="gCat" placeholder="Categoría" />
+        <input id="gDesc" placeholder="Detalle (opcional)" />
+        <button id="gAdd" title="Registrar gasto">＋</button>
+      </div>
+      <div class="modal-actions"><button class="m-btn ghost" id="gastosClose">Cerrar</button></div>
+    </div>
+  </div>
+
   <!-- Modal: info (diario de trading, etc.) -->
   <div class="modal-bg" id="infoBg">
     <div class="modal">
@@ -392,6 +407,7 @@
       <label class="fld"><span>Color de acento</span><select id="setAccent">
         <option value="cian">Cian</option><option value="violeta">Violeta</option>
         <option value="verde">Verde</option><option value="ambar">Ámbar</option></select></label>
+      <label class="fld"><span>Ciudad para el clima</span><input type="text" id="setCiudad" placeholder="Ej. Madrid" /></label>
       <label class="fld row2"><input type="checkbox" id="setTts" /><span>Leer las respuestas en voz alta por defecto</span></label>
       <div class="modal-actions">
         <button class="m-btn ghost" id="setCancel">Cerrar</button>
@@ -432,6 +448,8 @@ const SET = {
   set theme(v){ localStorage.setItem('nexus_theme', v); },
   get accent(){ return localStorage.getItem('nexus_accent') || 'cian'; },
   set accent(v){ localStorage.setItem('nexus_accent', v); },
+  get ciudad(){ return localStorage.getItem('nexus_ciudad') || ''; },
+  set ciudad(v){ localStorage.setItem('nexus_ciudad', v); },
 };
 
 /* ---------- Apariencia: tema + acento ---------- */
@@ -760,6 +778,7 @@ document.getElementById('settings').addEventListener('click', () => {
   document.getElementById('setTts').checked = SET.tts;
   document.getElementById('setTheme').value = SET.theme;
   document.getElementById('setAccent').value = SET.accent;
+  document.getElementById('setCiudad').value = SET.ciudad;
   setBg.classList.add('show');
 });
 document.getElementById('setCancel').addEventListener('click', () => setBg.classList.remove('show'));
@@ -772,6 +791,7 @@ document.getElementById('setSave').addEventListener('click', () => {
   SET.tts = document.getElementById('setTts').checked;
   SET.theme = document.getElementById('setTheme').value;
   SET.accent = document.getElementById('setAccent').value;
+  SET.ciudad = document.getElementById('setCiudad').value.trim();
   aplicarApariencia();
   aplicarTts(SET.tts);
   setBg.classList.remove('show');
@@ -1001,13 +1021,40 @@ async function mostrarInfo(titulo, url){
   }catch(_){ document.getElementById('infoBody').textContent = 'No se pudo cargar.'; }
 }
 document.getElementById('newsBtn').addEventListener('click', () => mostrarInfo('📰 Noticias de mercado', '/api/noticias'));
-document.getElementById('gastosBtn').addEventListener('click', () => mostrarInfo('💸 Gastos del mes', '/api/gastos'));
+
+/* Gastos: resumen + registrar */
+const gastosBg = document.getElementById('gastosBg');
+document.getElementById('gastosClose').addEventListener('click', () => gastosBg.classList.remove('show'));
+async function abrirGastos(){
+  gastosBg.classList.add('show');
+  const body = document.getElementById('gastosBody'); body.textContent = 'Cargando…';
+  try{ const r = await fetch('/api/gastos'); body.textContent = (await r.json()).texto || '(sin datos)'; }
+  catch(_){ body.textContent = 'No se pudo cargar.'; }
+}
+async function addGasto(){
+  const monto = document.getElementById('gMonto').value.trim();
+  const cat = document.getElementById('gCat').value.trim() || 'general';
+  const desc = document.getElementById('gDesc').value.trim();
+  if(!monto) return;
+  const r = await fetch('/api/gasto/agregar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({monto: monto, categoria: cat, descripcion: desc})});
+  const d = await r.json();
+  if(!d.ok){ alert(d.error || 'No se pudo registrar el gasto.'); return; }
+  document.getElementById('gMonto').value = ''; document.getElementById('gCat').value = '';
+  document.getElementById('gDesc').value = '';
+  abrirGastos();   // refresca el resumen
+}
+document.getElementById('gAdd').addEventListener('click', addGasto);
+document.getElementById('gDesc').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addGasto(); } });
+document.getElementById('gastosBtn').addEventListener('click', abrirGastos);
 document.getElementById('climaBtn').addEventListener('click', () => {
-  let ciudad = localStorage.getItem('nexus_ciudad') || '';
-  const ingresada = prompt('¿De qué ciudad quieres el clima?', ciudad);
-  if(ingresada === null) return;
-  ciudad = ingresada.trim();
-  if(ciudad) localStorage.setItem('nexus_ciudad', ciudad);
+  let ciudad = SET.ciudad;
+  if(!ciudad){                              // solo pregunta si no hay ciudad guardada
+    const ingresada = prompt('¿De qué ciudad quieres el clima? (puedes fijarla en ⚙ Ajustes)', '');
+    if(ingresada === null) return;
+    ciudad = ingresada.trim();
+    if(ciudad) SET.ciudad = ciudad;
+  }
   mostrarInfo('🌤️ Clima', '/api/clima?ciudad=' + encodeURIComponent(ciudad));
 });
 async function refreshPrecios(){
@@ -1108,6 +1155,20 @@ function arrancarPanel(){
   panelTimer = setInterval(() => { if(dashAbierto()) refreshPanel(); }, 20000);  // refresco periódico
 }
 
+/* ---------- Accesibilidad y atajos de teclado ---------- */
+// aria-label automatico para los botones de icono (mejora lectores de pantalla).
+function aplicarAria(){
+  document.querySelectorAll('button[title]:not([aria-label])').forEach(b => b.setAttribute('aria-label', b.title));
+}
+// Esc cierra cualquier modal abierto y el panel en movil.
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    let cerro = false;
+    document.querySelectorAll('.modal-bg.show').forEach(m => { m.classList.remove('show'); cerro = true; });
+    if(!cerro) cerrarDash();
+  }
+});
+
 /* ---------- PWA: service worker ---------- */
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
@@ -1116,6 +1177,7 @@ if('serviceWorker' in navigator){
 /* ---------- Inicio ---------- */
 (async function init(){
   aplicarApariencia();
+  aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado
