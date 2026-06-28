@@ -8,6 +8,7 @@ nexus_trades.log
 *.log
 nexus.db
 nexus.db-journal
+data/
 nexus_nt_sim/
 documentos/
 backups/

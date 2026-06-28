@@ -23,6 +23,7 @@ import uuid
 import datetime
 
 import nexus_util
+import nexus_ctx
 import nexus_ninjatrader as nt
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -32,15 +33,11 @@ ALERTAS_PATH = os.environ.get("NEXUS_ALERTAS_PATH") or os.path.join(_CARPETA, "a
 # --------------------------- Persistencia ---------------------------
 
 def cargar() -> list:
-    try:
-        with open(ALERTAS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f).get("alertas", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    return (nexus_util.cargar_json(nexus_ctx.user_path(ALERTAS_PATH), {"alertas": []}) or {}).get("alertas", [])
 
 
 def guardar(alertas: list) -> None:
-    nexus_util.guardar_json(ALERTAS_PATH, {"alertas": alertas})
+    nexus_util.guardar_json(nexus_ctx.user_path(ALERTAS_PATH), {"alertas": alertas})
 
 
 # --------------------------- Normalizacion ---------------------------

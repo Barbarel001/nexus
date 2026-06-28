@@ -16,6 +16,7 @@ import uuid
 import datetime
 
 import nexus_util
+import nexus_ctx
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 GASTOS_PATH = os.environ.get("NEXUS_GASTOS_PATH") or os.path.join(_CARPETA, "gastos.json")
@@ -23,11 +24,11 @@ MONEDA = os.environ.get("NEXUS_MONEDA") or "$"
 
 
 def cargar() -> list:
-    return (nexus_util.cargar_json(GASTOS_PATH, {"gastos": []}) or {}).get("gastos", [])
+    return (nexus_util.cargar_json(nexus_ctx.user_path(GASTOS_PATH), {"gastos": []}) or {}).get("gastos", [])
 
 
 def guardar(gastos: list) -> None:
-    nexus_util.guardar_json(GASTOS_PATH, {"gastos": gastos})
+    nexus_util.guardar_json(nexus_ctx.user_path(GASTOS_PATH), {"gastos": gastos})
 
 
 def _monto(v) -> float:
