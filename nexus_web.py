@@ -23,6 +23,7 @@ requiere tu aprobacion explicita en un modal de confirmacion del navegador.
 import os
 import sys
 import json
+import time
 import uuid
 import datetime
 import threading
@@ -58,8 +59,9 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 
 # Herramientas seguras, siempre disponibles en la web: lectura general, lectura de
 # NinjaTrader (estado/precio/posicion, no mueven dinero) y productividad (tareas).
-SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas",
-            "read_file", "list_directory"}
+# Nota de seguridad: read_file / list_directory NO se exponen en la web porque
+# permitirían leer archivos del servidor. Quedan solo en la terminal (uso local).
+SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
            | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
@@ -104,7 +106,35 @@ if NEXUS_MULTIUSER:
 NEXUS_ADMIN_EMAIL = {e.strip().lower() for e in nexus._env("NEXUS_ADMIN_EMAIL", "").replace(";", ",").split(",") if e.strip()}
 app.secret_key = nexus._env("NEXUS_SECRET", "") or os.urandom(24)
 app.permanent_session_lifetime = datetime.timedelta(days=30)
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+# NEXUS_HTTPS=1 marca la cookie como Secure (solo se envía por HTTPS). Actívalo en
+# producción detrás de TLS; déjalo off en local (http) para no romper el login.
+_COOKIE_SECURE = nexus._env("NEXUS_HTTPS", "0").lower() in ("1", "true", "yes", "on")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  SESSION_COOKIE_SECURE=_COOKIE_SECURE)
+
+# --- Límite de intentos de login (anti fuerza bruta), en memoria por IP ---
+_LOGIN_LIMITE = int(nexus._env("NEXUS_LOGIN_LIMITE", "8"))   # intentos
+_LOGIN_VENTANA = int(nexus._env("NEXUS_LOGIN_VENTANA", "300"))  # segundos
+_intentos_login = {}
+_lock_login = threading.Lock()
+
+
+def _rate_limit_ok(ip: str) -> bool:
+    ahora = time.time()
+    with _lock_login:
+        xs = [t for t in _intentos_login.get(ip, []) if ahora - t < _LOGIN_VENTANA]
+        _intentos_login[ip] = xs
+        return len(xs) < _LOGIN_LIMITE
+
+
+def _registrar_fallo(ip: str) -> None:
+    with _lock_login:
+        _intentos_login.setdefault(ip, []).append(time.time())
+
+
+def _limpiar_intentos(ip: str) -> None:
+    with _lock_login:
+        _intentos_login.pop(ip, None)
 
 LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS — Acceso</title>
@@ -166,23 +196,30 @@ def login():
     if not _auth_requerida():
         return redirect("/")
     error = ""
+    ip = request.remote_addr or "?"
+    if request.method == "POST" and not _rate_limit_ok(ip):
+        return ("Demasiados intentos. Espera unos minutos.", 429)
     if NEXUS_MULTIUSER:
         if request.method == "POST":
             u = nexus_db.autenticar(request.form.get("email", ""), request.form.get("password", ""))
             if u:
+                _limpiar_intentos(ip)
                 session["auth"] = True
                 session["user_id"] = u["id"]
                 session["email"] = u["email"]
                 session.permanent = True
                 return redirect("/")
+            _registrar_fallo(ip)
             error = "Email o contraseña incorrectos."
         return render_template_string(MULTIUSER_LOGIN_HTML, error=error, modo_sub="Inicia sesión")
     # Modo de una sola contraseña.
     if request.method == "POST":
         if hmac.compare_digest(request.form.get("password", ""), NEXUS_PASSWORD):
+            _limpiar_intentos(ip)
             session["auth"] = True
             session.permanent = True
             return redirect("/")
+        _registrar_fallo(ip)
         error = "Contraseña incorrecta."
     return render_template_string(LOGIN_HTML, error=error)
 

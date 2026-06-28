@@ -203,6 +203,35 @@ def test_resumen_accion():
 
 # --------------------------- Autenticacion (login opcional) ---------------------------
 
+def test_filesystem_tools_no_expuestas_en_web():
+    """read_file / list_directory NO deben estar disponibles vía web (lectura de archivos)."""
+    assert "read_file" not in nexus_web.SEGURAS
+    assert "list_directory" not in nexus_web.SEGURAS
+    # siguen existiendo en la terminal
+    assert "read_file" in nexus.EJECUTORES
+
+
+def test_filesystem_tools_no_expuestas_en_telegram():
+    import nexus_telegram
+    assert "read_file" not in nexus_telegram.SEGURAS
+    assert "list_directory" not in nexus_telegram.SEGURAS
+
+
+def test_login_rate_limit(monkeypatch):
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "claveok")
+    monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", False)
+    monkeypatch.setattr(nexus_web, "_LOGIN_LIMITE", 3)
+    nexus_web._intentos_login.clear()
+    c = nexus_web.app.test_client()
+    # 3 intentos fallidos permitidos
+    for _ in range(3):
+        r = c.post("/login", data={"password": "mala"})
+        assert r.status_code not in (429,)
+    # el 4º se bloquea
+    assert c.post("/login", data={"password": "mala"}).status_code == 429
+    nexus_web._intentos_login.clear()
+
+
 def test_sin_password_no_pide_login():
     """Por defecto (sin NEXUS_PASSWORD) no hay login: el uso local sigue igual."""
     c = nexus_web.app.test_client()

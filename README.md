@@ -151,6 +151,9 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_SECRET` | *(random)* | Secret key for signing the login session cookie. Set a fixed value to stay logged in across restarts |
 | `NEXUS_MULTIUSER` | `0` | `1` enables multi-user accounts (register/login with email+password over SQLite) — the basis for a hosted/SaaS deployment |
 | `NEXUS_DB_PATH` | `nexus.db` | SQLite database file for user accounts (git-ignored) |
+| `NEXUS_ADMIN_EMAIL` | *(none)* | Email(s) allowed into the admin panel (`/admin`) |
+| `NEXUS_HTTPS` | `0` | `1` marks the session cookie `Secure` (use behind TLS in production) |
+| `NEXUS_LOGIN_LIMITE` / `NEXUS_LOGIN_VENTANA` | `8` / `300` | Login attempts allowed per IP within the window (seconds) — anti brute-force |
 | `NEXUS_STRIPE_KEY` | *(none)* | Stripe secret key — enables subscription checkout (`pip install stripe`) |
 | `NEXUS_STRIPE_PRICE_PRO` / `_TEAM` | *(none)* | Stripe price IDs for the Pro / Team plans |
 | `NEXUS_STRIPE_WEBHOOK_SECRET` | *(none)* | Stripe webhook signing secret — auto-activates a user's plan on payment |
@@ -369,6 +372,11 @@ mode** first, and every order is your own decision. Template
 point if you distribute Nexus (adapt them with legal advice).
 
 ## Security
+
+See [`SECURITY.md`](SECURITY.md) for the full security model (local vs SaaS), the
+hardening done (hashed passwords, signed cookies, login rate-limit, no filesystem
+tools over the web, Stripe signature checks) and the known limitations to close
+before a public multi-user deployment.
 
 Nexus can run commands and write files on your machine, so it **asks for confirmation**
 before doing so. Read the command before approving. In the web UI those tools are
