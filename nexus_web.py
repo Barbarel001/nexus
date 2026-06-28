@@ -330,6 +330,24 @@ def diario_api():
     return jsonify({"texto": nt.diario()})
 
 
+@app.route("/api/noticias")
+def noticias_api():
+    """Titulares de mercado para el panel."""
+    return jsonify({"texto": noticias.tool_noticias({})})
+
+
+@app.route("/api/clima")
+def clima_api():
+    """Clima de una ciudad (o la de por defecto) para el panel."""
+    return jsonify({"texto": clima.tool_clima({"ciudad": request.args.get("ciudad", "")})})
+
+
+@app.route("/api/gastos")
+def gastos_api():
+    """Resumen de gastos del mes para el panel."""
+    return jsonify({"texto": gastos.tool_resumen_gastos({"mes": request.args.get("mes", "")})})
+
+
 @app.route("/api/nt/precio")
 def nt_precio_api():
     """Precio de un instrumento via NinjaTrader (para la watchlist del panel)."""

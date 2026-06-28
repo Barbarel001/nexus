@@ -86,3 +86,31 @@ def test_tools_gastos():
     assert "ocio" in gastos.tool_resumen_gastos({})
     for n in ("agregar_gasto", "resumen_gastos", "eliminar_gasto"):
         assert n in nexus.EJECUTORES
+
+
+# --------------------------- Endpoints del panel (web) ---------------------------
+
+def test_api_gastos_endpoint():
+    import nexus_web
+    gastos.agregar(15, "comida", "tacos")
+    c = nexus_web.app.test_client()
+    r = c.get("/api/gastos")
+    assert r.status_code == 200 and "comida" in r.get_json()["texto"]
+
+
+def test_api_noticias_endpoint(monkeypatch):
+    import nexus_web
+    monkeypatch.setattr(noticias, "obtener", lambda *a, **k: [{"titulo": "Titular X", "url": "http://x"}])
+    c = nexus_web.app.test_client()
+    r = c.get("/api/noticias")
+    assert r.status_code == 200 and "Titular X" in r.get_json()["texto"]
+
+
+def test_api_clima_endpoint(monkeypatch):
+    import nexus_web
+    import nexus_clima as clima
+    monkeypatch.setattr(clima, "obtener", lambda *a, **k: {
+        "ciudad": "Madrid", "temp": 20, "desc": "despejado", "max": 25, "min": 12})
+    c = nexus_web.app.test_client()
+    r = c.get("/api/clima?ciudad=Madrid")
+    assert r.status_code == 200 and "Madrid" in r.get_json()["texto"]

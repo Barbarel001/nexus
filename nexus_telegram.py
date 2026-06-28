@@ -202,17 +202,37 @@ def responder(chat_id, texto_usuario: str) -> str:
 
 def _manejar(chat_id, texto: str) -> str:
     t = texto.strip()
-    if t in ("/start", "/help", "/ayuda"):
-        return ("Soy NEXUS. Hablame normal y te ayudo: tareas, recordatorios, alertas de "
-                "precio, precios de NinjaTrader, memoria y mas.\n"
-                "Comandos: /nuevo (reinicia la charla), /tareas, /alertas.")
-    if t == "/nuevo":
+    partes = t.split(maxsplit=1)
+    cmd = partes[0].lower() if partes else ""
+    arg = partes[1].strip() if len(partes) > 1 else ""
+    if cmd in ("/start", "/help", "/ayuda"):
+        return ("Soy NEXUS. Háblame normal y te ayudo. Comandos rápidos:\n"
+                "/nuevo — reinicia la charla\n"
+                "/tareas — tus pendientes\n"
+                "/alertas — tus alertas de precio\n"
+                "/gastos — gastos del mes\n"
+                "/noticias — titulares de mercado\n"
+                "/clima <ciudad> — el tiempo\n"
+                "/agenda — tu Google Calendar\n"
+                "/correos — tus últimos correos\n"
+                "También puedes enviarme una FOTO y la analizo.")
+    if cmd == "/nuevo":
         _historiales.pop(chat_id, None)
         return "Listo, empezamos de cero."
-    if t == "/tareas":
+    if cmd == "/tareas":
         return _ejecutar_seguro("listar_tareas", {"filtro": "pendientes"})
-    if t == "/alertas":
+    if cmd == "/alertas":
         return _ejecutar_seguro("alerta_precio", {"accion": "listar"})
+    if cmd == "/gastos":
+        return _ejecutar_seguro("resumen_gastos", {})
+    if cmd == "/noticias":
+        return _ejecutar_seguro("noticias_mercado", {})
+    if cmd == "/clima":
+        return _ejecutar_seguro("clima", {"ciudad": arg})
+    if cmd == "/agenda":
+        return _ejecutar_seguro("google_agenda", {})
+    if cmd == "/correos":
+        return _ejecutar_seguro("google_correos", {})
     return responder(chat_id, texto)
 
 

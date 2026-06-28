@@ -100,9 +100,9 @@ def thinking_para(model: str):
     o None (desactivado) para los que no lo soportan (Haiku)."""
     return None if model.startswith("claude-haiku") else {"type": "adaptive"}
 
-# Archivo donde Nexus guarda lo que debe recordar (junto a este script).
+# Archivo donde Nexus guarda lo que debe recordar (junto a este script; configurable).
 CARPETA = os.path.dirname(os.path.abspath(__file__))
-MEMORIA_PATH = os.path.join(CARPETA, "memoria.json")
+MEMORIA_PATH = _env("NEXUS_MEMORIA_PATH", os.path.join(CARPETA, "memoria.json"))
 
 HOY = datetime.date.today().isoformat()
 
@@ -166,11 +166,7 @@ def _normalizar_nota(item) -> dict:
 
 def cargar_notas() -> list:
     """Memoria completa como lista de objetos {id, texto, categoria, creada}."""
-    try:
-        with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
-            crudas = json.load(f).get("notas", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    crudas = (nexus_util.cargar_json(MEMORIA_PATH, {"notas": []}) or {}).get("notas", [])
     return [n for n in (_normalizar_nota(x) for x in crudas) if n["texto"]]
 
 
