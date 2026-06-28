@@ -147,6 +147,8 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_HOST` | `127.0.0.1` | Bind address. `0.0.0.0` exposes Nexus on your local network so you can open it from your phone (same Wi-Fi) at `http://<your-PC-IP>:5000` |
 | `NEXUS_PASSWORD` | *(none)* | If set, Nexus requires a login (password) before access. Use it whenever you expose Nexus beyond your PC (LAN or a public tunnel) |
 | `NEXUS_SECRET` | *(random)* | Secret key for signing the login session cookie. Set a fixed value to stay logged in across restarts |
+| `NEXUS_MULTIUSER` | `0` | `1` enables multi-user accounts (register/login with email+password over SQLite) — the basis for a hosted/SaaS deployment |
+| `NEXUS_DB_PATH` | `nexus.db` | SQLite database file for user accounts (git-ignored) |
 | `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
 | `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |

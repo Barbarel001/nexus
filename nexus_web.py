@@ -91,6 +91,13 @@ app = Flask(__name__, static_folder=None)
 # Si defines NEXUS_PASSWORD, Nexus pide login antes de dar acceso. Sin esa variable,
 # no hay login (uso local de siempre). Pensado para abrirlo por un tunel publico.
 NEXUS_PASSWORD = nexus._env("NEXUS_PASSWORD", "")
+# Modo MULTIUSUARIO (SaaS): NEXUS_MULTIUSER=1 activa cuentas (registro/login con
+# email+contraseña) sobre SQLite. Si esta off, se usa el modo de una sola
+# contraseña (NEXUS_PASSWORD) o ninguno (uso local). Opt-in para no romper nada.
+import nexus_db
+NEXUS_MULTIUSER = nexus._env("NEXUS_MULTIUSER", "0").lower() in ("1", "true", "yes", "on")
+if NEXUS_MULTIUSER:
+    nexus_db.init()
 app.secret_key = nexus._env("NEXUS_SECRET", "") or os.urandom(24)
 app.permanent_session_lifetime = datetime.timedelta(days=30)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
@@ -118,14 +125,32 @@ LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
  </form>
 </body></html>"""
 
+# Pagina de login/registro para el modo multiusuario (email + contraseña).
+MULTIUSER_LOGIN_HTML = LOGIN_HTML.replace(
+    '<div class="sub">Acceso privado</div>',
+    '<div class="sub">{{ modo_sub }}</div>'
+).replace(
+    '<input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">\n   <button type="submit">Entrar</button>',
+    '<input type="email" name="email" placeholder="Email" autofocus autocomplete="email">\n'
+    '   <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password">\n'
+    '   <button type="submit" formaction="/login">Entrar</button>\n'
+    '   <div style="text-align:center;margin-top:12px;font-size:13px;color:#94a6bd">¿Sin cuenta?</div>\n'
+    '   <button type="submit" formaction="/register" style="background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3);margin-top:8px">Crear cuenta</button>'
+)
+
+
+def _auth_requerida() -> bool:
+    return bool(NEXUS_MULTIUSER or NEXUS_PASSWORD)
+
 
 @app.before_request
 def _guardia_acceso():
-    """Si hay NEXUS_PASSWORD, exige login para todo salvo la propia pagina de login."""
-    if not NEXUS_PASSWORD:
+    """Exige login si hay multiusuario o NEXUS_PASSWORD. La landing y los iconos
+    son publicos."""
+    if not _auth_requerida():
         return None
-    # Endpoints publicos (no requieren login): login, la landing de marketing y los iconos.
-    if request.endpoint in ("login", "landing", "icon192", "icon512", "manifest") or session.get("auth"):
+    if request.endpoint in ("login", "register", "landing", "icon192", "icon512", "manifest") \
+            or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -134,9 +159,21 @@ def _guardia_acceso():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if not NEXUS_PASSWORD:
+    if not _auth_requerida():
         return redirect("/")
     error = ""
+    if NEXUS_MULTIUSER:
+        if request.method == "POST":
+            u = nexus_db.autenticar(request.form.get("email", ""), request.form.get("password", ""))
+            if u:
+                session["auth"] = True
+                session["user_id"] = u["id"]
+                session["email"] = u["email"]
+                session.permanent = True
+                return redirect("/")
+            error = "Email o contraseña incorrectos."
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=error, modo_sub="Inicia sesión")
+    # Modo de una sola contraseña.
     if request.method == "POST":
         if hmac.compare_digest(request.form.get("password", ""), NEXUS_PASSWORD):
             session["auth"] = True
@@ -144,6 +181,21 @@ def login():
             return redirect("/")
         error = "Contraseña incorrecta."
     return render_template_string(LOGIN_HTML, error=error)
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    if not NEXUS_MULTIUSER:
+        return redirect("/login")
+    try:
+        u = nexus_db.crear_usuario(request.form.get("email", ""), request.form.get("password", ""))
+    except ValueError as e:
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=str(e), modo_sub="Crear cuenta")
+    session["auth"] = True
+    session["user_id"] = u["id"]
+    session["email"] = u["email"]
+    session.permanent = True
+    return redirect("/")
 
 
 @app.route("/logout")

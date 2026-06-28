@@ -6,6 +6,8 @@ alertas.json
 gastos.json
 nexus_trades.log
 *.log
+nexus.db
+nexus.db-journal
 nexus_nt_sim/
 documentos/
 backups/
