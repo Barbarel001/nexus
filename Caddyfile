@@ -1,0 +1,18 @@
+# Reverse proxy con HTTPS automático para NEXUS.
+# Cambia "tu-dominio.com" por tu dominio real (con el DNS apuntando al servidor).
+# Caddy obtiene y renueva el certificado TLS solo.
+
+tu-dominio.com {
+    encode gzip
+    # Streaming SSE: sin buffering para que el chat fluya en tiempo real.
+    reverse_proxy nexus:5000 {
+        flush_interval -1
+    }
+}
+
+# Para pruebas locales sin dominio, comenta el bloque de arriba y usa este:
+# :80 {
+#     reverse_proxy nexus:5000 {
+#         flush_interval -1
+#     }
+# }

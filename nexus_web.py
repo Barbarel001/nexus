@@ -151,7 +151,7 @@ def _guardia_acceso():
     son publicos."""
     if not _auth_requerida():
         return None
-    if request.endpoint in ("login", "register", "landing", "landing_en",
+    if request.endpoint in ("login", "register", "landing", "landing_en", "stripe_webhook",
                             "icon192", "icon512", "manifest") or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
@@ -370,6 +370,24 @@ def checkout_api():
     except (ValueError, RuntimeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "url": url})
+
+
+@app.route("/api/stripe/webhook", methods=["POST"])
+def stripe_webhook():
+    """Webhook de Stripe: al completar el pago, activa el plan del usuario."""
+    try:
+        evento = pagos.verificar_webhook(request.get_data(), request.headers.get("Stripe-Signature", ""))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    if evento.get("type") == "checkout.session.completed":
+        sesion = evento.get("data", {}).get("object", {})
+        email = sesion.get("customer_email") or (sesion.get("customer_details") or {}).get("email")
+        plan = (sesion.get("metadata") or {}).get("plan", "pro")
+        if email:
+            u = nexus_db.usuario_por_email(email)
+            if u:
+                nexus_db.cambiar_plan(u["id"], plan)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/setup-status")
