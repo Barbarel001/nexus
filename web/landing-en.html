@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NEXUS — Tu copiloto de trading y operaciones personales</title>
-<meta name="description" content="Nexus: asistente de IA que opera con NinjaTrader, vigila tus alertas, organiza tareas y gastos, y te avisa por Telegram. Privado, con modo local gratis." />
+<title>NEXUS — Your trading & personal-ops copilot</title>
+<meta name="description" content="Nexus: an AI assistant that trades with NinjaTrader, watches your price alerts, organizes tasks and expenses, and pings you on Telegram. Private, with a free local mode." />
 <meta name="theme-color" content="#0a0f1a" />
 <link rel="icon" href="/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,7 +22,6 @@
   .btn{display:inline-block;background:var(--accent);color:#04121d;font-weight:600;padding:11px 20px;border-radius:11px;transition:.15s}
   .btn:hover{filter:brightness(1.08)}
   .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
-  /* hero */
   .hero{text-align:center;padding:64px 0 40px}
   .hero h1{font-size:clamp(30px,5vw,52px);font-weight:700;line-height:1.15;letter-spacing:-.5px}
   .hero h1 .g{background:linear-gradient(90deg,#38bdf8,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -30,7 +29,6 @@
   .cta{display:flex;gap:14px;justify-content:center;margin-top:28px;flex-wrap:wrap}
   .pill{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);border:1px solid var(--line);padding:6px 14px;border-radius:20px;margin-top:26px}
   .led{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}
-  /* features */
   section{padding:48px 0}
   h2{font-size:clamp(24px,3.2vw,32px);text-align:center;font-weight:700;margin-bottom:8px}
   .sub{color:var(--faint);text-align:center;margin-bottom:36px}
@@ -39,7 +37,6 @@
   .card .ic{font-size:26px}
   .card h3{font-size:16px;margin:12px 0 6px}
   .card p{color:var(--dim);font-size:14px}
-  /* pricing */
   .prices{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;align-items:start}
   .price{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;display:flex;flex-direction:column;gap:12px}
   .price.feat{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 20px 50px rgba(56,189,248,.10)}
@@ -56,59 +53,59 @@
     <header>
       <span class="logo">NEXUS</span>
       <nav>
-        <a href="#features">Funciones</a>
-        <a href="#pricing">Precios</a>
-        <a href="/en" style="font-size:12.5px;color:var(--faint)">EN</a>
-        <a href="/app" class="btn ghost">Abrir app</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/landing" style="font-size:12.5px;color:var(--faint)">ES</a>
+        <a href="/app" class="btn ghost">Open app</a>
       </nav>
     </header>
 
     <section class="hero">
-      <h1>Tu <span class="g">copiloto de trading</span><br>y de operaciones personales</h1>
-      <p>Nexus es un asistente de IA que opera con NinjaTrader, vigila tus alertas de precio,
-         organiza tus tareas y gastos, y te avisa por Telegram — desde cualquier lugar.
-         Privado, con <strong>modo local gratis</strong>.</p>
+      <h1>Your <span class="g">trading copilot</span><br>and personal-ops assistant</h1>
+      <p>Nexus is an AI assistant that trades with NinjaTrader, watches your price alerts,
+         organizes your tasks and expenses, and pings you on Telegram — from anywhere.
+         Private, with a <strong>free local mode</strong>.</p>
       <div class="cta">
-        <a href="/app" class="btn">Empezar gratis</a>
-        <a href="#pricing" class="btn ghost">Ver planes</a>
+        <a href="/app" class="btn">Start free</a>
+        <a href="#pricing" class="btn ghost">See plans</a>
       </div>
-      <div class="pill"><span class="led"></span> Modo simulación incluido · prueba sin riesgo</div>
+      <div class="pill"><span class="led"></span> Simulation mode included · try it risk-free</div>
     </section>
 
     <section id="features">
-      <h2>Todo en un solo sistema</h2>
-      <p class="sub">Trading, productividad e inteligencia, conectados.</p>
+      <h2>Everything in one system</h2>
+      <p class="sub">Trading, productivity and intelligence, connected.</p>
       <div class="grid">
-        <div class="card"><div class="ic">📈</div><h3>Trading con NinjaTrader</h3><p>Órdenes, brackets OCO (stop/take-profit), reglas de riesgo, alertas de precio, bitácora y diario.</p></div>
-        <div class="card"><div class="ic">👁️</div><h3>Visión</h3><p>Mándale el screenshot de un gráfico y lo analiza. Por web o por Telegram.</p></div>
-        <div class="card"><div class="ic">🤖</div><h3>Telegram + proactivo</h3><p>Contrólalo desde el móvil sin túnel. Resumen matutino y avisos automáticos.</p></div>
-        <div class="card"><div class="ic">🧠</div><h3>Memoria y documentos</h3><p>Recuerda tus preferencias y responde con base en tus propios archivos (RAG).</p></div>
-        <div class="card"><div class="ic">✅</div><h3>Productividad</h3><p>Tareas con proyectos y recurrencia, recordatorios, gastos, clima y noticias.</p></div>
-        <div class="card"><div class="ic">🔒</div><h3>Privado y seguro</h3><p>Tus datos viven en tu equipo. Modo local con Ollama: $0 y sin enviar nada a la nube.</p></div>
+        <div class="card"><div class="ic">📈</div><h3>Trading with NinjaTrader</h3><p>Orders, OCO brackets (stop/take-profit), risk rules, price alerts, audit log and journal.</p></div>
+        <div class="card"><div class="ic">👁️</div><h3>Vision</h3><p>Send it a chart screenshot and it reads it. On the web or via Telegram.</p></div>
+        <div class="card"><div class="ic">🤖</div><h3>Telegram + proactive</h3><p>Control it from your phone with no tunnel. Morning briefing and automatic alerts.</p></div>
+        <div class="card"><div class="ic">🧠</div><h3>Memory & documents</h3><p>Remembers your preferences and answers from your own files (RAG).</p></div>
+        <div class="card"><div class="ic">✅</div><h3>Productivity</h3><p>Tasks with projects and recurrence, reminders, expenses, weather and news.</p></div>
+        <div class="card"><div class="ic">🔒</div><h3>Private & secure</h3><p>Your data lives on your machine. Local mode with Ollama: $0 and nothing leaves your device.</p></div>
       </div>
     </section>
 
     <section id="pricing">
-      <h2>Planes simples</h2>
-      <p class="sub">Empieza gratis. Sube de plan cuando lo necesites.</p>
+      <h2>Simple plans</h2>
+      <p class="sub">Start free. Upgrade when you need to.</p>
       <div class="prices">
         <div class="price">
           <span class="tag">Free</span>
           <div class="amt">$0</div>
-          <ul><li>Chat con modelo local (Ollama)</li><li>Tareas, gastos, alertas</li><li>Panel web + PWA</li><li>Modo simulación de trading</li></ul>
-          <a href="/app" class="btn ghost">Empezar</a>
+          <ul><li>Chat with a local model (Ollama)</li><li>Tasks, expenses, alerts</li><li>Web panel + PWA</li><li>Trading simulation mode</li></ul>
+          <a href="/app" class="btn ghost">Get started</a>
         </div>
         <div class="price feat">
           <span class="tag">Pro</span>
-          <div class="amt">$9<small>/mes</small></div>
-          <ul><li>Todo lo de Free</li><li>Chat con Claude (visión incluida)</li><li>Trading real + OCO + riesgo</li><li>Telegram + resumen matutino</li><li>Google Calendar y Gmail</li></ul>
-          <a href="/app" class="btn">Probar Pro</a>
+          <div class="amt">$9<small>/mo</small></div>
+          <ul><li>Everything in Free</li><li>Chat with Claude (vision included)</li><li>Live trading + OCO + risk</li><li>Telegram + morning briefing</li><li>Google Calendar & Gmail</li></ul>
+          <a href="/app" class="btn">Try Pro</a>
         </div>
         <div class="price">
           <span class="tag">Team</span>
-          <div class="amt">$29<small>/mes</small></div>
-          <ul><li>Todo lo de Pro</li><li>Varios usuarios</li><li>Notificaciones a Discord</li><li>Soporte prioritario</li></ul>
-          <a href="/app" class="btn ghost">Contactar</a>
+          <div class="amt">$29<small>/mo</small></div>
+          <ul><li>Everything in Pro</li><li>Multiple users</li><li>Discord notifications</li><li>Priority support</li></ul>
+          <a href="/app" class="btn ghost">Contact us</a>
         </div>
       </div>
     </section>
@@ -116,9 +113,9 @@
 
   <footer>
     <div class="wrap">
-      <p class="disc">⚠️ Nexus no es asesoría financiera. Operar con instrumentos financieros conlleva riesgo de pérdida.
-        Prueba en modo simulación; cada orden es tu decisión. Consulta el aviso legal completo.</p>
-      <p>© NEXUS · <a href="/app">Abrir app</a> · Hecho con la API de Claude.</p>
+      <p class="disc">⚠️ Nexus is not financial advice. Trading financial instruments involves risk of loss.
+        Test in simulation mode; every order is your decision. See the full disclaimer.</p>
+      <p>© NEXUS · <a href="/app">Open app</a> · Built with the Claude API.</p>
     </div>
   </footer>
 </body>

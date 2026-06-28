@@ -151,8 +151,8 @@ def _guardia_acceso():
     son publicos."""
     if not _auth_requerida():
         return None
-    if request.endpoint in ("login", "register", "landing", "icon192", "icon512", "manifest") \
-            or session.get("auth"):
+    if request.endpoint in ("login", "register", "landing", "landing_en",
+                            "icon192", "icon512", "manifest") or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -320,8 +320,15 @@ def index():
 @app.route("/landing")
 @app.route("/inicio")
 def landing():
-    """Pagina de marketing (no requiere login)."""
+    """Pagina de marketing en español (no requiere login)."""
     return send_from_directory(WEBDIR, "landing.html")
+
+
+@app.route("/en")
+@app.route("/landing/en")
+def landing_en():
+    """Marketing landing page in English (public)."""
+    return send_from_directory(WEBDIR, "landing-en.html")
 
 
 # --- PWA: manifest, service worker e iconos (servidos desde la raiz) ---
