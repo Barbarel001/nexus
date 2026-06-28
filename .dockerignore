@@ -1,0 +1,23 @@
+.git
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+# Datos personales / secretos (no van en la imagen)
+memoria.json
+conversaciones.json
+tareas.json
+alertas.json
+gastos.json
+nexus.db
+nexus.db-journal
+*.log
+credentials.json
+token.json
+backups/
+nexus_nt_sim/
+documentos/

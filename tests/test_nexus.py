@@ -215,6 +215,18 @@ def test_landing_publica():
     assert r.status_code == 200 and b"NEXUS" in r.data
 
 
+def test_landing_en_publica():
+    c = nexus_web.app.test_client()
+    r = c.get("/en")
+    assert r.status_code == 200 and b"trading copilot" in r.data
+    assert c.get("/landing/en").status_code == 200
+
+
+def test_wsgi_expone_app():
+    import wsgi
+    assert wsgi.app is nexus_web.app
+
+
 def test_setup_status():
     c = nexus_web.app.test_client()
     r = c.get("/api/setup-status")
