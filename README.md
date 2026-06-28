@@ -153,6 +153,7 @@ Everything is configurable via **environment variables** (no need to edit the co
 | `NEXUS_DB_PATH` | `nexus.db` | SQLite database file for user accounts (git-ignored) |
 | `NEXUS_STRIPE_KEY` | *(none)* | Stripe secret key — enables subscription checkout (`pip install stripe`) |
 | `NEXUS_STRIPE_PRICE_PRO` / `_TEAM` | *(none)* | Stripe price IDs for the Pro / Team plans |
+| `NEXUS_STRIPE_WEBHOOK_SECRET` | *(none)* | Stripe webhook signing secret — auto-activates a user's plan on payment |
 | `NEXUS_BASE_URL` | `http://localhost:5000` | Public base URL used for Stripe return links |
 | `NEXUS_BACKEND` | `claude` | `claude` (API) or `ollama` (local model, $0) |
 | `NEXUS_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model used in local mode |

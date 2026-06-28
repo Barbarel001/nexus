@@ -55,5 +55,20 @@ def crear_checkout(plan: str, email: str = "") -> str:
         success_url=BASE_URL + "/app?pago=ok",
         cancel_url=BASE_URL + "/landing",
         customer_email=email or None,
+        metadata={"plan": (plan or "").lower()},  # lo leemos en el webhook
     )
     return sesion.url
+
+
+WEBHOOK_SECRET = os.environ.get("NEXUS_STRIPE_WEBHOOK_SECRET", "")
+
+
+def verificar_webhook(payload: bytes, firma: str):
+    """Verifica la firma del webhook de Stripe y devuelve el evento. Lanza si falla."""
+    if not WEBHOOK_SECRET:
+        raise RuntimeError("Falta NEXUS_STRIPE_WEBHOOK_SECRET.")
+    try:
+        import stripe
+    except ImportError:
+        raise RuntimeError("Falta la libreria 'stripe'. Ejecuta: pip install stripe")
+    return stripe.Webhook.construct_event(payload, firma, WEBHOOK_SECRET)

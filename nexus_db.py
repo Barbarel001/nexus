@@ -110,6 +110,14 @@ def obtener_usuario(user_id: int):
     return dict(row) if row else None
 
 
+def usuario_por_email(email: str):
+    init()
+    with _conn() as c:
+        row = c.execute("SELECT id, email, plan, creado FROM users WHERE email=?",
+                        (_normalizar_email(email),)).fetchone()
+    return dict(row) if row else None
+
+
 def cambiar_plan(user_id: int, plan: str) -> None:
     init()
     with _conn() as c:

@@ -1,0 +1,36 @@
+# Despliegue de NEXUS con HTTPS automático (Caddy) en un comando:
+#   1) Edita el dominio en Caddyfile y las variables de .env (copia env.example a .env)
+#   2) docker compose up -d
+services:
+  nexus:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NEXUS_HOST: 0.0.0.0
+      NEXUS_PORT: "5000"
+      NEXUS_OPEN: "0"
+      NEXUS_MULTIUSER: "1"
+      NEXUS_DB_PATH: /data/nexus.db
+    volumes:
+      - nexus_data:/data          # BD y datos persistentes
+    expose:
+      - "5000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - nexus
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  nexus_data:
+  caddy_data:
+  caddy_config:

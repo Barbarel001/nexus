@@ -67,3 +67,34 @@ def test_api_checkout_sin_stripe(monkeypatch):
     c = nexus_web.app.test_client()
     r = c.get("/api/checkout?plan=pro")
     assert r.status_code == 400 and r.get_json()["ok"] is False
+
+
+def test_webhook_sin_secret(monkeypatch):
+    monkeypatch.setattr(pagos, "WEBHOOK_SECRET", "")
+    with pytest.raises(RuntimeError):
+        pagos.verificar_webhook(b"{}", "sig")
+
+
+def test_api_webhook_firma_invalida(monkeypatch):
+    import nexus_web
+    # Sin secret valido / firma -> 400 (no revienta el servidor).
+    monkeypatch.setattr(nexus_web.pagos, "WEBHOOK_SECRET", "")
+    c = nexus_web.app.test_client()
+    r = c.post("/api/stripe/webhook", data=b"{}", headers={"Stripe-Signature": "x"})
+    assert r.status_code == 400
+
+
+def test_webhook_activa_plan(monkeypatch, tmp_path):
+    """Simula un evento de Stripe y comprueba que sube el plan del usuario."""
+    import nexus_web, nexus_db
+    monkeypatch.setattr(nexus_db, "DB_PATH", str(tmp_path / "wh.db"))
+    nexus_db.init()
+    u = nexus_db.crear_usuario("pagador@mail.com", "secreta1")
+    # Falseamos la verificacion de Stripe para devolver un evento ya validado.
+    evento = {"type": "checkout.session.completed",
+              "data": {"object": {"customer_email": "pagador@mail.com", "metadata": {"plan": "pro"}}}}
+    monkeypatch.setattr(nexus_web.pagos, "verificar_webhook", lambda *a, **k: evento)
+    c = nexus_web.app.test_client()
+    r = c.post("/api/stripe/webhook", data=b"{}", headers={"Stripe-Signature": "x"})
+    assert r.status_code == 200
+    assert nexus_db.obtener_usuario(u["id"])["plan"] == "pro"

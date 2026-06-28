@@ -2,7 +2,22 @@
 
 Guía para poner Nexus en producción como servicio web.
 
-## 1. Con Docker (recomendado)
+## 0. Un comando con HTTPS (docker compose + Caddy) ⭐
+La forma más rápida de poner Nexus online con certificado TLS automático:
+```bash
+cp env.example .env        # rellena tus claves
+#   edita Caddyfile y pon tu dominio (con el DNS apuntando al servidor)
+docker compose up -d
+```
+Caddy obtiene el certificado solo y hace de reverse proxy a Nexus. Datos persistentes
+en el volumen `nexus_data`.
+
+### Webhook de Stripe (activa el plan al pagar)
+En el dashboard de Stripe crea un webhook hacia `https://tu-dominio.com/api/stripe/webhook`
+(evento `checkout.session.completed`) y pon el secreto en `NEXUS_STRIPE_WEBHOOK_SECRET`.
+Al completarse un pago, Nexus sube automáticamente el plan del usuario.
+
+## 1. Con Docker (manual)
 ```bash
 docker build -t nexus .
 docker run -d --name nexus -p 5000:5000 \
