@@ -100,6 +100,8 @@ import nexus_db
 NEXUS_MULTIUSER = nexus._env("NEXUS_MULTIUSER", "0").lower() in ("1", "true", "yes", "on")
 if NEXUS_MULTIUSER:
     nexus_db.init()
+# Emails con acceso al panel de administración (coma-separados).
+NEXUS_ADMIN_EMAIL = {e.strip().lower() for e in nexus._env("NEXUS_ADMIN_EMAIL", "").replace(";", ",").split(",") if e.strip()}
 app.secret_key = nexus._env("NEXUS_SECRET", "") or os.urandom(24)
 app.permanent_session_lifetime = datetime.timedelta(days=30)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
@@ -357,7 +359,7 @@ def icon512():
 def config():
     return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
                     "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
-                    "ollama_disponible": nexus_ollama.disponible()})
+                    "ollama_disponible": nexus_ollama.disponible(), "admin": _es_admin()})
 
 
 @app.route("/api/checkout")
@@ -370,6 +372,49 @@ def checkout_api():
     except (ValueError, RuntimeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "url": url})
+
+
+def _es_admin() -> bool:
+    """True si el usuario actual es administrador (multiusuario + email en la lista)."""
+    return bool(NEXUS_MULTIUSER and NEXUS_ADMIN_EMAIL
+                and (session.get("email") or "").lower() in NEXUS_ADMIN_EMAIL)
+
+
+@app.route("/admin")
+def admin_page():
+    if not _es_admin():
+        return ("No autorizado", 403)
+    return send_from_directory(WEBDIR, "admin.html")
+
+
+@app.route("/api/admin/usuarios")
+def admin_usuarios():
+    if not _es_admin():
+        return jsonify({"error": "no autorizado"}), 403
+    return jsonify({"usuarios": nexus_db.listar_usuarios()})
+
+
+@app.route("/api/admin/stats")
+def admin_stats():
+    if not _es_admin():
+        return jsonify({"error": "no autorizado"}), 403
+    s = nexus_db.stats()
+    s["conversaciones"] = len(cargar_convs().get("convs", []))
+    return jsonify(s)
+
+
+@app.route("/api/admin/plan", methods=["POST"])
+def admin_plan():
+    if not _es_admin():
+        return jsonify({"error": "no autorizado"}), 403
+    body = request.get_json(silent=True) or {}
+    try:
+        uid = int(body.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "user_id invalido"}), 400
+    plan = (body.get("plan") or "free").strip().lower()
+    nexus_db.cambiar_plan(uid, plan)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/health")

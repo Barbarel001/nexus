@@ -264,6 +264,7 @@
           <span class="badge"><span class="led"></span> En línea</span>
           <button class="btn-ic" id="dashBtn" title="Panel (trading y tareas)">📊</button>
           <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
+          <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -1224,6 +1225,7 @@ if('serviceWorker' in navigator){
   aplicarApariencia();
   aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
+  if(cfg.admin){ const ab = document.getElementById('adminBtn'); if(ab) ab.style.display = 'flex'; }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado
   arrancarPanel();

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — Admin</title>
+<link rel="icon" href="/icon-192.png" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root{--bg:#0a0f1a;--panel:#121a28;--line:rgba(148,163,184,.14);--txt:#e6edf5;--dim:#94a6bd;--faint:#5f6e82;--accent:#38bdf8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--txt);background:var(--bg);padding:24px}
+  .wrap{max-width:900px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .logo{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:5px;font-size:20px}
+  .tag{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--faint)}
+  a.app{margin-left:auto;color:var(--accent);font-size:14px;text-decoration:none}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card .n{font-size:30px;font-weight:700} .card .l{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:1px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  th,td{padding:11px 14px;text-align:left;font-size:14px;border-bottom:1px solid var(--line)}
+  th{color:var(--faint);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  tr:last-child td{border-bottom:none}
+  td.mono{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--dim)}
+  select{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 8px;font-family:inherit}
+  .empty{color:var(--faint);text-align:center;padding:30px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="logo">NEXUS</span><span class="tag">Admin</span>
+      <a class="app" href="/app">← Volver a la app</a>
+    </header>
+
+    <div class="cards" id="cards"></div>
+
+    <table>
+      <thead><tr><th>ID</th><th>Email</th><th>Plan</th><th>Alta</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" class="empty">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+
+<script>
+function esc(s){const d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
+const PLANES=['free','pro','team'];
+
+async function cargar(){
+  try{
+    const s=await (await fetch('/api/admin/stats')).json();
+    const cards=document.getElementById('cards');
+    const porPlan=Object.entries(s.por_plan||{}).map(([k,v])=>`<div class="card"><div class="n">${v}</div><div class="l">${esc(k)}</div></div>`).join('');
+    cards.innerHTML=`<div class="card"><div class="n">${s.usuarios||0}</div><div class="l">Usuarios</div></div>`+
+                    `<div class="card"><div class="n">${s.conversaciones||0}</div><div class="l">Conversaciones</div></div>`+porPlan;
+  }catch(_){}
+  try{
+    const d=await (await fetch('/api/admin/usuarios')).json();
+    const rows=document.getElementById('rows'); rows.innerHTML='';
+    const us=d.usuarios||[];
+    if(!us.length){ rows.innerHTML='<tr><td colspan="4" class="empty">Sin usuarios todavía.</td></tr>'; return; }
+    for(const u of us){
+      const tr=document.createElement('tr');
+      const opts=PLANES.map(p=>`<option value="${p}" ${p===u.plan?'selected':''}>${p}</option>`).join('');
+      tr.innerHTML=`<td class="mono">${u.id}</td><td>${esc(u.email)}</td>`+
+                   `<td><select data-id="${u.id}">${opts}</select></td><td class="mono">${esc(u.creado||'')}</td>`;
+      tr.querySelector('select').addEventListener('change',async e=>{
+        await fetch('/api/admin/plan',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({user_id:u.id,plan:e.target.value})});
+        cargar();
+      });
+      rows.appendChild(tr);
+    }
+  }catch(_){ document.getElementById('rows').innerHTML='<tr><td colspan="4" class="empty">No se pudo cargar.</td></tr>'; }
+}
+cargar();
+</script>
+</body>
+</html>
