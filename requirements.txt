@@ -1,2 +1,6 @@
 anthropic>=0.40
 flask>=3.0
+
+# Opcionales (instálalos solo si usas estas funciones):
+#   pywebpush>=2     -> notificaciones Web Push (avisos con la pestaña cerrada; ver nexus_push.py)
+#   pypdf>=4         -> leer PDFs en la búsqueda de documentos (nexus_docs.py)

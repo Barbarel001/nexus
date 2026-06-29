@@ -16,6 +16,32 @@ self.addEventListener('activate', e => {
   );
 });
 
+// --- Web Push: mostrar la notificación aunque la pestaña esté cerrada ---
+self.addEventListener('push', e => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (_) { data = { body: e.data && e.data.text() }; }
+  const titulo = data.title || 'NEXUS';
+  const opts = {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: { url: data.url || '/' },
+  };
+  e.waitUntil(self.registration.showNotification(titulo, opts));
+});
+
+// Al pulsar la notificación: enfocar una pestaña abierta o abrir la app.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+      for (const c of cs) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;            // POST, etc. → no se cachea
