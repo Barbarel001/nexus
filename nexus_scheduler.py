@@ -40,9 +40,15 @@ BACKUP_KEEP = int(nexus._env("NEXUS_BACKUP_KEEP", "7"))
 
 
 def _notificar(texto: str) -> None:
-    """Envia una notificacion por todos los canales configurados (Telegram, Discord)."""
+    """Envia una notificacion por todos los canales configurados (Telegram, Discord,
+    y Web Push si esta configurado)."""
     telegram.enviar(texto)
     discord.enviar(texto)
+    try:
+        import nexus_push
+        nexus_push.enviar("NEXUS", texto, "/")
+    except Exception:
+        pass  # el push nunca debe interrumpir el resto de avisos
 
 
 def _archivos_datos() -> list:

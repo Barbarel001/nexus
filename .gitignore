@@ -4,6 +4,8 @@ conversaciones.json
 tareas.json
 alertas.json
 gastos.json
+operaciones.json
+push_subs.json
 nexus_trades.log
 *.log
 nexus.db

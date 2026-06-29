@@ -56,6 +56,7 @@ import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
 import nexus_noticias as noticias  # titulares de mercado
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
+import nexus_push as push  # notificaciones Web Push (opcional)
 import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_totp  # 2FA (TOTP) en Python puro
 import nexus_util  # escritura atomica / logging
@@ -950,6 +951,20 @@ def agregar_tarea_api():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "tarea": tareas.dto(t)})
+
+
+@app.route("/api/push/clave")
+def push_clave_api():
+    """Clave pública VAPID + si el push real está configurado (para el navegador)."""
+    return jsonify({"configurado": push.configurado(), "clave": push.clave_publica()})
+
+
+@app.route("/api/push/suscribir", methods=["POST"])
+def push_suscribir_api():
+    """Guarda una suscripción de PushManager para enviarle avisos aunque esté cerrado."""
+    sub = request.get_json(silent=True) or {}
+    ok = push.agregar_sub(sub)
+    return jsonify({"ok": ok})
 
 
 @app.route("/api/alertas")
