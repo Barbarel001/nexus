@@ -103,6 +103,31 @@ def eliminar(ref: str) -> str:
     return f"Operacion eliminada: {o['instrument']} {MONEDA}{o['pnl']}"
 
 
+def filtrar(ops: list = None, instrument: str = "", desde: str = "", hasta: str = "") -> list:
+    """Filtra operaciones por instrumento y/o rango de fechas (AAAA-MM-DD inclusive)."""
+    ops = cargar() if ops is None else ops
+    inst = (instrument or "").strip().upper()
+    desde = (desde or "").strip()
+    hasta = (hasta or "").strip()
+    out = []
+    for o in ops:
+        if inst and (o.get("instrument", "") or "").upper() != inst:
+            continue
+        f = o.get("fecha", "")
+        if desde and f < desde:
+            continue
+        if hasta and f > hasta:
+            continue
+        out.append(o)
+    return out
+
+
+def instrumentos(ops: list = None) -> list:
+    """Lista de instrumentos presentes en la bitácora (para poblar filtros)."""
+    ops = cargar() if ops is None else ops
+    return sorted({(o.get("instrument") or "?") for o in ops})
+
+
 def _ordenadas(ops: list) -> list:
     """Operaciones por fecha (y orden de registro) para la curva de equity."""
     return sorted(ops, key=lambda o: (o.get("fecha", ""), ops.index(o)))

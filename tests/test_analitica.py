@@ -83,6 +83,25 @@ def test_stats_vacio():
     assert A.estadisticas() == {"n": 0}
 
 
+# --------------------------- Filtros ---------------------------
+
+def test_filtrar_por_instrumento_y_fecha():
+    A.registrar("ES", 100, fecha="2026-01-05")
+    A.registrar("NQ", -40, fecha="2026-01-10")
+    A.registrar("ES", 25, fecha="2026-02-01")
+    assert len(A.filtrar(instrument="ES")) == 2
+    assert len(A.filtrar(desde="2026-01-08", hasta="2026-01-31")) == 1
+    assert A.filtrar(instrument="ES", desde="2026-01-20")[0]["fecha"] == "2026-02-01"
+    assert A.instrumentos() == ["ES", "NQ"]
+
+
+def test_estadisticas_sobre_filtrado():
+    A.registrar("ES", 100)
+    A.registrar("NQ", -40)
+    s = A.estadisticas(A.filtrar(instrument="ES"))
+    assert s["n"] == 1 and s["pnl_total"] == 100
+
+
 # --------------------------- Tamano de posicion ---------------------------
 
 def test_tamano_posicion_acciones():
@@ -132,3 +151,17 @@ def test_trades_listar_y_eliminar_web(monkeypatch, tmp_path):
     r = c.post("/api/trade/eliminar", json={"ref": ops[0]["id"]}).get_json()
     assert r["ok"] is True
     assert len(c.get("/api/trades").get_json()["ops"]) == 1
+
+
+def test_trades_filtro_web(monkeypatch, tmp_path):
+    import nexus_web
+    monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", False)
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "")
+    monkeypatch.setattr(A, "OPS_PATH", str(tmp_path / "ops_f.json"))
+    c = nexus_web.app.test_client()
+    c.post("/api/trade", json={"instrument": "ES", "pnl": 100})
+    c.post("/api/trade", json={"instrument": "NQ", "pnl": -40})
+    d = c.get("/api/trades/stats?instrument=ES").get_json()
+    assert d["stats"]["n"] == 1 and d["stats"]["pnl_total"] == 100
+    assert set(d["instrumentos"]) == {"ES", "NQ"}
+    assert len(c.get("/api/trades?instrument=NQ").get_json()["ops"]) == 1

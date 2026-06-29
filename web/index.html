@@ -313,7 +313,13 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">📊 Analítica <button class="mini" id="anRefresh" title="Actualizar">↻</button></div>
+        <div class="sect-h">📊 Analítica
+          <select id="anFiltro" title="Filtrar por instrumento"
+                  style="margin-left:auto;background:var(--panel-2);border:1px solid var(--line-2);color:var(--txt);border-radius:8px;font-size:11px;padding:2px 4px">
+            <option value="">Todos</option>
+          </select>
+          <button class="mini" id="anRefresh" title="Actualizar">↻</button>
+        </div>
         <div class="card">
           <div class="nt-sum" id="anStats">Sin operaciones aún.</div>
           <canvas id="anEquity" height="44" style="width:100%;margin-top:8px;display:none"></canvas>
@@ -949,10 +955,26 @@ async function refreshPanel(){
 
 /* ---------- Analítica de trading ---------- */
 function fmtMoney(v){ return (v<0?'-$':'$') + Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:2}); }
+function anFiltroQS(extra){
+  const inst = (document.getElementById('anFiltro')||{}).value || '';
+  const p = new URLSearchParams(extra||{});
+  if(inst) p.set('instrument', inst);
+  const s = p.toString();
+  return s ? ('?'+s) : '';
+}
+function poblarFiltro(instrumentos){
+  const sel = document.getElementById('anFiltro'); if(!sel) return;
+  const actual = sel.value;
+  const opts = ['<option value="">Todos</option>']
+    .concat((instrumentos||[]).map(i => '<option value="'+esc(i)+'">'+esc(i)+'</option>'));
+  sel.innerHTML = opts.join('');
+  sel.value = actual;   // conserva la selección si sigue existiendo
+}
 async function refreshAnalitica(){
   try{
-    const r = await fetch('/api/trades/stats'); if(!r.ok) return;
+    const r = await fetch('/api/trades/stats' + anFiltroQS()); if(!r.ok) return;
     const d = await r.json(); const s = d.stats || {};
+    poblarFiltro(d.instrumentos);
     const el = document.getElementById('anStats');
     if(!s.n){ el.textContent = 'Sin operaciones aún.'; document.getElementById('anEquity').style.display='none'; return; }
     const pf = s.profit_factor_infinito ? '∞' : (s.profit_factor ?? '—');
@@ -969,7 +991,7 @@ async function refreshAnalitica(){
 async function renderTrades(){
   const cont = document.getElementById('anTrades'); if(!cont) return;
   try{
-    const r = await fetch('/api/trades?n=6'); if(!r.ok) return;
+    const r = await fetch('/api/trades' + anFiltroQS({n:6})); if(!r.ok) return;
     const ops = (await r.json()).ops || [];
     cont.innerHTML = '';
     for(const o of ops){
@@ -1065,6 +1087,7 @@ async function addTarea(){
 document.getElementById('tareaAdd').addEventListener('click', addTarea);
 document.getElementById('anAdd').addEventListener('click', addTrade);
 document.getElementById('anRefresh').addEventListener('click', refreshAnalitica);
+document.getElementById('anFiltro').addEventListener('change', refreshAnalitica);
 document.getElementById('anPnl').addEventListener('keydown', e => { if(e.key==='Enter') addTrade(); });
 document.getElementById('rCalc').addEventListener('click', calcRiesgo);
 document.getElementById('tareaInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addTarea(); } });
@@ -1350,6 +1373,16 @@ function aplicarAria(){
 }
 // Esc cierra cualquier modal abierto y el panel en movil.
 document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if(mod && e.key.toLowerCase() === 'k'){    // buscar conversaciones
+    e.preventDefault(); const s = document.getElementById('search'); if(s){ s.focus(); s.select(); } return;
+  }
+  if(mod && e.key.toLowerCase() === 'b'){ e.preventDefault(); toggleDash(); return; }       // panel
+  if(mod && e.key.toLowerCase() === 'j'){ e.preventDefault(); const n = document.getElementById('new'); if(n) n.click(); return; }  // nueva
+  if(mod && e.key === 'Enter'){             // enviar mensaje (desde donde estés)
+    if(inp && inp.value.trim()){ e.preventDefault(); if(form.requestSubmit) form.requestSubmit(); else sendMessage(inp.value); }
+    return;
+  }
   if(e.key === 'Escape'){
     let cerro = false;
     document.querySelectorAll('.modal-bg.show').forEach(m => { m.classList.remove('show'); cerro = true; });

@@ -852,19 +852,26 @@ def gasto_agregar_api():
 
 @app.route("/api/trades/stats")
 def trades_stats_api():
-    """Estadisticas de trading + curva de equity para el panel."""
+    """Estadisticas de trading + curva de equity. Filtros opcionales: instrument,
+    desde, hasta (AAAA-MM-DD)."""
     import math as _math
-    s = analitica.estadisticas()
+    g = request.args.get
+    ops = analitica.filtrar(instrument=g("instrument", ""), desde=g("desde", ""), hasta=g("hasta", ""))
+    s = analitica.estadisticas(ops)
     if s.get("profit_factor") == _math.inf:   # JSON no admite Infinity: lo marcamos aparte
         s["profit_factor"] = None
         s["profit_factor_infinito"] = True
-    return jsonify({"stats": s, "equity": analitica.curva_equity()})
+    return jsonify({"stats": s, "equity": analitica.curva_equity(ops),
+                    "instrumentos": analitica.instrumentos()})
 
 
 @app.route("/api/trades")
 def trades_lista_api():
-    """Lista las últimas operaciones registradas (más recientes primero)."""
-    ops = list(reversed(analitica.cargar()))
+    """Lista las últimas operaciones (más recientes primero). Filtros opcionales:
+    instrument, desde, hasta (AAAA-MM-DD)."""
+    g = request.args.get
+    ops = list(reversed(analitica.filtrar(instrument=g("instrument", ""),
+                                          desde=g("desde", ""), hasta=g("hasta", ""))))
     try:
         n = int(request.args.get("n", 20))
     except (TypeError, ValueError):
