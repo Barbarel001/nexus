@@ -102,6 +102,25 @@ def test_estadisticas_sobre_filtrado():
     assert s["n"] == 1 and s["pnl_total"] == 100
 
 
+# --------------------------- Detalle (R, notas, lado) ---------------------------
+
+def test_registrar_con_detalle():
+    o = A.registrar("MNQ", 200, lado="long", entrada=21000, salida=21100, r=2, notas="buena entrada")
+    assert o["r"] == 2.0 and o["entrada"] == 21000 and o["notas"] == "buena entrada"
+
+
+def test_avg_r():
+    A.registrar("ES", 100, r=2)
+    A.registrar("ES", -50, r=-1)
+    A.registrar("ES", 30)            # sin R: no cuenta para la media
+    assert A.estadisticas()["avg_r"] == 0.5     # (2 + -1) / 2
+
+
+def test_avg_r_none_sin_datos():
+    A.registrar("ES", 100)
+    assert A.estadisticas()["avg_r"] is None
+
+
 # --------------------------- Tamano de posicion ---------------------------
 
 def test_tamano_posicion_acciones():
