@@ -25,6 +25,7 @@ import sys
 import json
 import time
 import uuid
+import secrets
 import datetime
 import threading
 
@@ -42,6 +43,7 @@ except ImportError:
 import anthropic
 import nexus_util  # escritura atomica / logging
 import nexus_ctx  # contexto de usuario (aislamiento de datos)
+import nexus_totp  # 2FA (TOTP) en Python puro
 import nexus  # reutilizamos toda la logica del Nexus de terminal
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
@@ -137,6 +139,60 @@ def _limpiar_intentos(ip: str) -> None:
     with _lock_login:
         _intentos_login.pop(ip, None)
 
+
+# ---------------- Proteccion CSRF (token "double-submit") -------------------
+# Cada sesion lleva un token CSRF. Las peticiones que cambian estado (POST/PUT/
+# PATCH/DELETE) deben reenviarlo en la cabecera 'X-CSRF-Token' (las llamadas fetch
+# del panel) o en el campo de formulario 'csrf_token'. El token tambien se publica
+# en una cookie legible por JS para el patron double-submit. Solo se EXIGE cuando
+# hay login activo (NEXUS_PASSWORD o multiusuario): es cuando existe una sesion que
+# valga la pena falsificar y cuando Nexus se expone fuera de casa.
+CSRF_COOKIE = "nexus_csrf"
+# Endpoints exentos: el webhook de Stripe se valida por su firma; health es publico;
+# login/registro son previos a la sesion y ya estan cubiertos por SameSite=Lax.
+CSRF_EXENTAS = {"stripe_webhook", "health", "login", "register", "login_2fa"}
+
+
+def _csrf_token() -> str:
+    tok = session.get("_csrf")
+    if not tok:
+        tok = secrets.token_hex(32)
+        session["_csrf"] = tok
+    return tok
+
+
+def _csrf_valido() -> bool:
+    enviado = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token") or ""
+    esperado = session.get("_csrf") or ""
+    return bool(esperado) and hmac.compare_digest(str(enviado), str(esperado))
+
+
+@app.before_request
+def _guardia_csrf():
+    if not _auth_requerida():
+        return None
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if request.endpoint in CSRF_EXENTAS:
+        return None
+    if not _csrf_valido():
+        return jsonify({"error": "CSRF token invalido o ausente"}), 403
+    return None
+
+
+@app.after_request
+def _publicar_csrf(resp):
+    """Garantiza el token de sesion y lo publica en una cookie legible por el panel."""
+    try:
+        if _auth_requerida():
+            resp.set_cookie(CSRF_COOKIE, _csrf_token(), samesite="Lax",
+                            secure=_COOKIE_SECURE, httponly=False,
+                            max_age=60 * 60 * 24 * 30)
+    except RuntimeError:
+        pass  # sin contexto de sesion/peticion
+    return resp
+
+
 LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS — Acceso</title>
 <style>
@@ -184,8 +240,9 @@ def _guardia_acceso():
     son publicos."""
     if not _auth_requerida():
         return None
-    if request.endpoint in ("login", "register", "landing", "landing_en", "stripe_webhook",
-                            "health", "icon192", "icon512", "manifest") or session.get("auth"):
+    if request.endpoint in ("login", "register", "login_2fa", "landing", "landing_en",
+                            "stripe_webhook", "health", "icon192", "icon512",
+                            "manifest") or session.get("auth"):
         return None
     if request.path.startswith("/api/"):
         return jsonify({"error": "no autorizado"}), 401
@@ -218,6 +275,13 @@ def login():
             u = nexus_db.autenticar(request.form.get("email", ""), request.form.get("password", ""))
             if u:
                 _limpiar_intentos(ip)
+                _, totp_on = nexus_db.get_totp(u["id"])
+                if totp_on:
+                    # Contraseña OK pero falta el segundo factor: estado intermedio.
+                    session.clear()
+                    session["pending_2fa"] = u["id"]
+                    session["pending_email"] = u["email"]
+                    return render_template_string(TWOFA_HTML, error="", csrf_token=_csrf_token())
                 session["auth"] = True
                 session["user_id"] = u["id"]
                 session["email"] = u["email"]
@@ -257,6 +321,46 @@ def register():
 def logout():
     session.clear()
     return redirect("/login")
+
+
+# --------- 2FA: pagina de desafio (segundo factor tras la contraseña) ---------
+TWOFA_HTML = LOGIN_HTML.replace(
+    '<div class="sub">Acceso privado</div>',
+    '<div class="sub">Verificación en 2 pasos</div>'
+).replace(
+    '<form class="box" method="POST" action="/login">',
+    '<form class="box" method="POST" action="/login/2fa">'
+).replace(
+    '<input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">\n   <button type="submit">Entrar</button>',
+    '<input type="hidden" name="csrf_token" value="{{ csrf_token }}">\n'
+    '   <input type="text" name="code" placeholder="Código de 6 dígitos" autofocus '
+    'inputmode="numeric" autocomplete="one-time-code" maxlength="6" '
+    'style="text-align:center;letter-spacing:6px;font-size:20px">\n'
+    '   <button type="submit">Verificar</button>'
+)
+
+
+@app.route("/login/2fa", methods=["POST"])
+def login_2fa():
+    uid = session.get("pending_2fa")
+    if not uid:
+        return redirect("/login")
+    ip = request.remote_addr or "?"
+    if not _rate_limit_ok(ip):
+        return ("Demasiados intentos. Espera unos minutos.", 429)
+    secret, enabled = nexus_db.get_totp(uid)
+    if enabled and nexus_totp.verificar(secret, request.form.get("code", "")):
+        _limpiar_intentos(ip)
+        email = session.get("pending_email", "")
+        session.clear()
+        session["auth"] = True
+        session["user_id"] = uid
+        session["email"] = email
+        session.permanent = True
+        return redirect("/")
+    _registrar_fallo(ip)
+    return render_template_string(TWOFA_HTML, error="Código incorrecto.",
+                                  csrf_token=_csrf_token())
 
 # Registro de confirmaciones pendientes (handshake SSE <-> /api/confirm).
 _pendientes = {}
@@ -406,7 +510,8 @@ def icon512():
 def config():
     return jsonify({"acciones": WEB_ACCIONES, "modelo": nexus.MODEL, "modelos": sorted(MODELOS_OK),
                     "backend": nexus.BACKEND, "ollama_model": nexus_ollama.OLLAMA_MODEL,
-                    "ollama_disponible": nexus_ollama.disponible(), "admin": _es_admin()})
+                    "ollama_disponible": nexus_ollama.disponible(), "admin": _es_admin(),
+                    "multiuser": bool(_uid_actual())})
 
 
 @app.route("/api/checkout")
@@ -419,6 +524,70 @@ def checkout_api():
     except (ValueError, RuntimeError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "url": url})
+
+
+# ---------------- 2FA: configuracion desde la cuenta (requiere login) ----------
+def _uid_actual():
+    """ID del usuario logueado en modo multiusuario, o None."""
+    return session.get("user_id") if (NEXUS_MULTIUSER and session.get("user_id")) else None
+
+
+@app.route("/api/2fa/estado")
+def api_2fa_estado():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"disponible": False, "enabled": False})
+    _, enabled = nexus_db.get_totp(uid)
+    return jsonify({"disponible": True, "enabled": enabled})
+
+
+@app.route("/api/2fa/setup", methods=["POST"])
+def api_2fa_setup():
+    """Genera (o regenera) un secreto pendiente y devuelve el otpauth para el QR."""
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    secret = nexus_totp.generar_secreto()
+    nexus_db.set_totp_secret(uid, secret)
+    return jsonify({"ok": True, "secret": secret,
+                    "otpauth": nexus_totp.uri_otpauth(secret, session.get("email", "cuenta"))})
+
+
+@app.route("/api/2fa/activar", methods=["POST"])
+def api_2fa_activar():
+    """Confirma el secreto pendiente con un codigo del autenticador y activa el 2FA."""
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    secret, _ = nexus_db.get_totp(uid)
+    if not secret:
+        return jsonify({"ok": False, "error": "primero genera el código QR"}), 400
+    if not nexus_totp.verificar(secret, body.get("code", "")):
+        return jsonify({"ok": False, "error": "código incorrecto"}), 400
+    nexus_db.enable_totp(uid)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/2fa/desactivar", methods=["POST"])
+def api_2fa_desactivar():
+    """Desactiva el 2FA tras validar un codigo vigente (evita que un atacante lo quite)."""
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    secret, enabled = nexus_db.get_totp(uid)
+    if enabled and not nexus_totp.verificar(secret, body.get("code", "")):
+        return jsonify({"ok": False, "error": "código incorrecto"}), 400
+    nexus_db.disable_totp(uid)
+    return jsonify({"ok": True})
+
+
+@app.route("/seguridad")
+def seguridad_page():
+    if not _uid_actual():
+        return redirect("/login") if _auth_requerida() else ("2FA solo en modo multiusuario.", 400)
+    return send_from_directory(WEBDIR, "seguridad.html")
 
 
 def _es_admin() -> bool:

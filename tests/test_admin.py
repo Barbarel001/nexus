@@ -29,9 +29,19 @@ def test_listar_y_stats():
 
 def _cliente_admin(monkeypatch, email="admin@nexus.com"):
     monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", True)
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "")
     monkeypatch.setattr(nexus_web, "NEXUS_ADMIN_EMAIL", {email})
     c = nexus_web.app.test_client()
     return c
+
+
+def _tok(c):
+    """Extrae el token CSRF de la cookie publicada por el servidor."""
+    r = c.get("/")
+    for h in r.headers.getlist("Set-Cookie"):
+        if "nexus_csrf=" in h:
+            return h.split("nexus_csrf=", 1)[1].split(";", 1)[0]
+    return ""
 
 
 def test_admin_requiere_ser_admin(monkeypatch):
@@ -54,7 +64,8 @@ def test_admin_acceso_y_cambio_plan(monkeypatch):
     assert c.get("/api/admin/stats").status_code == 200
     assert c.get("/admin").status_code == 200
     # cambia el plan de un cliente
-    r2 = c.post("/api/admin/plan", json={"user_id": objetivo["id"], "plan": "team"})
+    r2 = c.post("/api/admin/plan", json={"user_id": objetivo["id"], "plan": "team"},
+                headers={"X-CSRF-Token": _tok(c)})
     assert r2.status_code == 200 and r2.get_json()["ok"] is True
     assert nexus_db.obtener_usuario(objetivo["id"])["plan"] == "team"
 

@@ -24,3 +24,23 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      # Escaneo de vulnerabilidades conocidas en las dependencias (CVE/PyPI advisories).
+      # No bloquea el merge (continue-on-error) para no frenar por avisos de terceros;
+      # revisa el resumen en la pestaña Actions.
+      - name: Audit dependencies
+        continue-on-error: true
+        run: pip-audit -r requirements.txt --desc

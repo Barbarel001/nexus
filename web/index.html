@@ -265,6 +265,7 @@
           <button class="btn-ic" id="dashBtn" title="Panel (trading y tareas)">📊</button>
           <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
           <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
+          <a class="btn-ic" id="secBtn" href="/seguridad" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -437,6 +438,27 @@
   </div>
 
 <script>
+// --- Proteccion CSRF: adjunta el token (cookie nexus_csrf) a toda peticion que
+// cambie estado (POST/PUT/PATCH/DELETE) del mismo origen. Transparente para el resto
+// del codigo: envuelve window.fetch una sola vez.
+(function(){
+  const origFetch = window.fetch.bind(window);
+  function csrfToken(){
+    const m = document.cookie.match(/(?:^|;\s*)nexus_csrf=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  window.fetch = function(url, opts){
+    opts = opts || {};
+    const metodo = (opts.method || "GET").toUpperCase();
+    const externo = typeof url === "string" && /^https?:\/\//i.test(url) && !url.startsWith(location.origin);
+    if(!externo && !["GET","HEAD","OPTIONS"].includes(metodo)){
+      const h = new Headers(opts.headers || {});
+      if(!h.has("X-CSRF-Token")) h.set("X-CSRF-Token", csrfToken());
+      opts.headers = h;
+    }
+    return origFetch(url, opts);
+  };
+})();
 const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const inp  = document.getElementById('inp');
@@ -1226,6 +1248,7 @@ if('serviceWorker' in navigator){
   aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   if(cfg.admin){ const ab = document.getElementById('adminBtn'); if(ab) ab.style.display = 'flex'; }
+  if(cfg.multiuser){ const sb = document.getElementById('secBtn'); if(sb) sb.style.display = 'flex'; }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado
   arrancarPanel();

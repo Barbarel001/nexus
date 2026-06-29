@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Seguridad (2FA)</title>
+<style>
+ *{box-sizing:border-box} html,body{margin:0;min-height:100%}
+ body{font-family:system-ui,'Segoe UI',Roboto,sans-serif;
+   background:radial-gradient(900px 500px at 60% -160px,rgba(56,189,248,.10),transparent 70%),#0a0f1a;
+   color:#e6edf5;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px}
+ .box{width:100%;max-width:460px;padding:28px;background:#121a28;border:1px solid rgba(148,163,184,.20);
+   border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+ h1{font-size:20px;margin:0 0 4px;letter-spacing:1px}
+ .sub{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#5f6e82;margin-bottom:20px}
+ .estado{font-size:14px;padding:10px 12px;border-radius:10px;margin-bottom:16px}
+ .on{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#86efac}
+ .off{background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.30);color:#fca5a5}
+ p{font-size:14px;line-height:1.5;color:#c3cede}
+ ol{font-size:14px;line-height:1.6;color:#c3cede;padding-left:20px}
+ .secreto{font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:2px;
+   background:#0d1420;border:1px dashed rgba(56,189,248,.4);color:#7dd3fc;padding:12px;
+   border-radius:10px;text-align:center;word-break:break-all;margin:10px 0;user-select:all}
+ .uri{font-size:11px;color:#5f6e82;word-break:break-all;margin-bottom:12px}
+ input{width:100%;height:46px;background:#0d1420;border:1px solid rgba(148,163,184,.30);color:#e6edf5;
+   font-size:18px;padding:0 14px;border-radius:11px;outline:none;margin:8px 0;text-align:center;letter-spacing:6px}
+ input:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+ button{width:100%;height:46px;border:none;border-radius:11px;cursor:pointer;font-weight:600;font-size:15px;margin-top:8px}
+ .primary{background:#38bdf8;color:#04121d}
+ .danger{background:transparent;color:#fca5a5;border:1px solid rgba(248,113,113,.4)}
+ .ghost{background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3)}
+ button:hover{filter:brightness(1.08)}
+ .msg{min-height:18px;font-size:13px;text-align:center;margin-top:10px}
+ .err{color:#f87171}.ok{color:#86efac}
+ a.volver{display:inline-block;margin-top:18px;color:#5f6e82;font-size:13px;text-decoration:none}
+ .hidden{display:none}
+</style>
+</head>
+<body>
+ <div class="box">
+   <h1>Seguridad de la cuenta</h1>
+   <div class="sub">Verificación en 2 pasos (2FA)</div>
+   <div id="estado" class="estado off">Cargando…</div>
+
+   <!-- 2FA desactivado: alta -->
+   <div id="alta" class="hidden">
+     <p>Añade un segundo factor con una app de autenticación (Google Authenticator,
+        Authy, 1Password…). Aunque alguien robe tu contraseña, no podrá entrar sin tu teléfono.</p>
+     <button id="btnGenerar" class="primary">Activar 2FA</button>
+     <div id="paso2" class="hidden">
+       <ol>
+         <li>Abre tu app de autenticación y elige <b>“Introducir clave manualmente”</b>.</li>
+         <li>Pega esta clave (no la compartas con nadie):</li>
+       </ol>
+       <div id="secreto" class="secreto"></div>
+       <div id="uri" class="uri"></div>
+       <p>Escribe el código de 6 dígitos que muestra la app para confirmar:</p>
+       <input id="codeAlta" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+       <button id="btnActivar" class="primary">Confirmar y activar</button>
+     </div>
+   </div>
+
+   <!-- 2FA activado: baja -->
+   <div id="baja" class="hidden">
+     <p>El 2FA está <b>activo</b>. Para desactivarlo, introduce un código actual de tu app:</p>
+     <input id="codeBaja" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+     <button id="btnDesactivar" class="danger">Desactivar 2FA</button>
+   </div>
+
+   <div id="msg" class="msg"></div>
+   <a class="volver" href="/">← Volver a Nexus</a>
+ </div>
+
+<script>
+// CSRF: lee la cookie publicada por el servidor y la reenvia en la cabecera.
+function csrfToken(){
+  const m = document.cookie.match(/(?:^|;\s*)nexus_csrf=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+async function api(url, body){
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {"Content-Type":"application/json","X-CSRF-Token":csrfToken()},
+    body: body ? JSON.stringify(body) : null,
+  });
+  return r.json();
+}
+const $ = id => document.getElementById(id);
+function msg(t, ok){ const m=$("msg"); m.textContent=t; m.className="msg "+(ok?"ok":"err"); }
+
+async function cargar(){
+  const e = await (await fetch("/api/2fa/estado")).json();
+  if(!e.disponible){
+    $("estado").textContent = "El 2FA está disponible solo en modo multiusuario.";
+    return;
+  }
+  if(e.enabled){
+    $("estado").className="estado on"; $("estado").textContent="🔒 2FA activado";
+    $("baja").classList.remove("hidden"); $("alta").classList.add("hidden");
+  } else {
+    $("estado").className="estado off"; $("estado").textContent="2FA desactivado";
+    $("alta").classList.remove("hidden"); $("baja").classList.add("hidden");
+  }
+}
+
+$("btnGenerar").onclick = async () => {
+  const r = await api("/api/2fa/setup");
+  if(r.ok){
+    $("secreto").textContent = r.secret;
+    $("uri").innerHTML = '<a href="'+r.otpauth+'" style="color:#5f6e82">'+r.otpauth+'</a>';
+    $("paso2").classList.remove("hidden"); msg("");
+  } else msg(r.error||"Error", false);
+};
+$("btnActivar").onclick = async () => {
+  const r = await api("/api/2fa/activar", {code: $("codeAlta").value});
+  if(r.ok){ msg("✓ 2FA activado correctamente", true); setTimeout(cargar, 800); }
+  else msg(r.error||"Error", false);
+};
+$("btnDesactivar").onclick = async () => {
+  const r = await api("/api/2fa/desactivar", {code: $("codeBaja").value});
+  if(r.ok){ msg("2FA desactivado", true); setTimeout(cargar, 800); }
+  else msg(r.error||"Error", false);
+};
+cargar();
+</script>
+</body>
+</html>

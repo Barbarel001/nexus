@@ -20,18 +20,28 @@ Antes de abrirlo a terceros:
 - **Login con límite de intentos** por IP (anti fuerza bruta). ✅
 - **HTTPS** mediante reverse proxy (Caddy/Nginx) — imprescindible. ✅ (ver `DEPLOY.md`)
 - **Webhook de Stripe** con verificación de firma. ✅
+- **CSRF tokens** en todas las acciones POST cuando hay login activo. ✅
+- **2FA (TOTP)** opcional por usuario (Google Authenticator/Authy/1Password). ✅
+- **Escaneo de dependencias** (`pip-audit` en CI + Dependabot). ✅
 
-## ⚠️ Limitaciones conocidas (TODO antes de SaaS público)
-1. **Aislamiento de datos por usuario:** ✅ RESUELTO. En modo multiusuario, cada
-   usuario guarda sus datos (memoria, tareas, alertas, gastos, conversaciones,
-   documentos) en su propia carpeta `data/users/<id>/` (`nexus_ctx`). Un usuario no
-   puede ver los datos de otro.
-2. **CSRF tokens:** se confía en `SameSite=Lax` (mitiga la mayoría de casos). Para SaaS,
-   añadir tokens CSRF a las acciones POST.
-3. **2FA:** no implementado.
-4. **Escaneo de dependencias:** recomendable añadir Dependabot / `pip-audit` en CI.
-5. **Inyección de prompt:** el agente lee web/documentos/correos; las acciones que
-   importan están detrás de confirmación, lo que lo mitiga, pero revisa antes de aprobar.
+## ✅ Resuelto
+1. **Aislamiento de datos por usuario:** en modo multiusuario, cada usuario guarda sus
+   datos (memoria, tareas, alertas, gastos, conversaciones, documentos) en su propia
+   carpeta `data/users/<id>/` (`nexus_ctx`). Un usuario no puede ver los datos de otro.
+2. **CSRF tokens:** patrón *double-submit*. El servidor publica un token en la cookie
+   `nexus_csrf` y lo exige en la cabecera `X-CSRF-Token` (o el campo `csrf_token`) en
+   todo POST/PUT/PATCH/DELETE cuando el login está activo. El webhook de Stripe (firma
+   propia) y el login/registro (cubiertos por `SameSite=Lax`) quedan exentos.
+3. **2FA (TOTP):** cada usuario puede activar verificación en 2 pasos desde
+   `/seguridad`. Implementado en Python puro (`nexus_totp`, RFC 6238), sin dependencias.
+   Tras la contraseña, el login pide un código de 6 dígitos.
+4. **Escaneo de dependencias:** `pip-audit` corre en CI (`.github/workflows/ci.yml`) y
+   Dependabot (`.github/dependabot.yml`) abre PRs semanales de actualización (pip +
+   GitHub Actions).
+
+## ⚠️ Pendiente / a revisar
+- **Inyección de prompt:** el agente lee web/documentos/correos; las acciones que
+  importan están detrás de confirmación, lo que lo mitiga, pero revisa antes de aprobar.
 
 ## Variables de seguridad
 | Variable | Para qué |

@@ -48,6 +48,12 @@ def init() -> None:
             datos TEXT NOT NULL,
             PRIMARY KEY(user_id, clave),
             FOREIGN KEY(user_id) REFERENCES users(id))""")
+        # Migracion suave: columnas de 2FA (TOTP) si la tabla es de una version previa.
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+        if "totp_secret" not in cols:
+            c.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT")
+        if "totp_enabled" not in cols:
+            c.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
 
 
 # --------------------------- Contraseñas ---------------------------
@@ -147,6 +153,39 @@ def stats() -> dict:
         por_plan = {r["plan"]: r["n"]
                     for r in c.execute("SELECT plan, COUNT(*) AS n FROM users GROUP BY plan").fetchall()}
     return {"usuarios": total, "por_plan": por_plan}
+
+
+# --------------------------- 2FA (TOTP) ---------------------------
+
+def get_totp(user_id: int):
+    """Devuelve (secreto, activado) del usuario; (None, False) si no existe."""
+    init()
+    with _conn() as c:
+        row = c.execute("SELECT totp_secret, totp_enabled FROM users WHERE id=?",
+                        (user_id,)).fetchone()
+    if not row:
+        return (None, False)
+    return (row["totp_secret"], bool(row["totp_enabled"]))
+
+
+def set_totp_secret(user_id: int, secret: str) -> None:
+    """Guarda un secreto TOTP pendiente (aun no activado hasta confirmar un codigo)."""
+    init()
+    with _conn() as c:
+        c.execute("UPDATE users SET totp_secret=?, totp_enabled=0 WHERE id=?", (secret, user_id))
+
+
+def enable_totp(user_id: int) -> None:
+    init()
+    with _conn() as c:
+        c.execute("UPDATE users SET totp_enabled=1 WHERE id=?", (user_id,))
+
+
+def disable_totp(user_id: int) -> None:
+    """Desactiva el 2FA y borra el secreto."""
+    init()
+    with _conn() as c:
+        c.execute("UPDATE users SET totp_secret=NULL, totp_enabled=0 WHERE id=?", (user_id,))
 
 
 # --------------------------- Datos por usuario ---------------------------
