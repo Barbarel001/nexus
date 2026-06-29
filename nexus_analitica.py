@@ -16,13 +16,17 @@ Configuracion:
     NEXUS_MONEDA     Simbolo de moneda para mostrar (defecto '$').
 """
 
+import csv
 import datetime
+import io
 import math
 import os
 import uuid
 
 import nexus_ctx
 import nexus_util
+
+CSV_COLS = ["fecha", "instrument", "lado", "qty", "entrada", "salida", "pnl", "r", "notas"]
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 OPS_PATH = os.environ.get("NEXUS_OPS_PATH") or os.path.join(_CARPETA, "operaciones.json")
@@ -248,6 +252,42 @@ def tamano_posicion(saldo, riesgo_pct, entrada, stop, valor_por_punto=1.0) -> di
         "contratos": contratos,
         "riesgo_real": round(contratos * riesgo_por_contrato, 2),
     }
+
+
+# ============================================================
+#  IMPORTAR / EXPORTAR CSV  (intercambio con el broker / hoja de calculo)
+# ============================================================
+
+def exportar_csv(ops: list = None) -> str:
+    """Devuelve las operaciones como CSV (cabecera + filas)."""
+    ops = cargar() if ops is None else ops
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(CSV_COLS)
+    for o in ops:
+        w.writerow(["" if o.get(c) is None else o.get(c, "") for c in CSV_COLS])
+    return buf.getvalue()
+
+
+def importar_csv(texto: str) -> dict:
+    """Importa operaciones desde un CSV (cabecera flexible; columnas en cualquier orden).
+    Requiere al menos 'instrument' y 'pnl' por fila. Devuelve {agregadas, errores}."""
+    agregadas = errores = 0
+    try:
+        lector = csv.DictReader(io.StringIO(texto or ""))
+    except (csv.Error, TypeError):
+        return {"agregadas": 0, "errores": 0}
+    for fila in lector:
+        f = {(k or "").strip().lower(): (v or "").strip() for k, v in fila.items() if k}
+        try:
+            registrar(f.get("instrument") or f.get("instrumento") or "",
+                      f.get("pnl"), f.get("lado", ""), f.get("qty") or 0,
+                      f.get("entrada"), f.get("salida"), f.get("notas", ""),
+                      f.get("fecha", ""), f.get("r"))
+            agregadas += 1
+        except Exception:
+            errores += 1
+    return {"agregadas": agregadas, "errores": errores}
 
 
 # ============================================================

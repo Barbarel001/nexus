@@ -102,6 +102,54 @@ def test_estadisticas_sobre_filtrado():
     assert s["n"] == 1 and s["pnl_total"] == 100
 
 
+# --------------------------- CSV ---------------------------
+
+def test_exportar_csv():
+    A.registrar("ES", 100, lado="long", r=2)
+    txt = A.exportar_csv()
+    lineas = txt.strip().splitlines()
+    assert lineas[0] == "fecha,instrument,lado,qty,entrada,salida,pnl,r,notas"
+    assert "ES" in lineas[1] and "100" in lineas[1]
+
+
+def test_importar_csv_y_errores():
+    csv_txt = ("instrument,pnl,lado,r\n"
+               "MNQ,150,long,2\n"
+               "ES,-50,short,\n"
+               ",10,,\n"          # sin instrumento -> error
+               "NQ,abc,,\n")       # pnl inválido -> error
+    r = A.importar_csv(csv_txt)
+    assert r["agregadas"] == 2 and r["errores"] == 2
+    assert len(A.cargar()) == 2
+
+
+def test_csv_roundtrip():
+    A.registrar("ES", 100, lado="long", entrada=5000, salida=5010, r=1.5, notas="ok")
+    A.registrar("NQ", -40, lado="short")
+    txt = A.exportar_csv()
+    A.guardar([])                         # vacía
+    assert A.cargar() == []
+    r = A.importar_csv(txt)
+    assert r["agregadas"] == 2
+    s = A.estadisticas()
+    assert s["n"] == 2 and s["pnl_total"] == 60
+
+
+def test_csv_web(monkeypatch, tmp_path):
+    import nexus_web
+    monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", False)
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "")
+    monkeypatch.setattr(A, "OPS_PATH", str(tmp_path / "ops_csv.json"))
+    c = nexus_web.app.test_client()
+    c.post("/api/trade", json={"instrument": "ES", "pnl": 100})
+    r = c.get("/api/trades/export.csv")
+    assert r.headers["Content-Disposition"].startswith("attachment")
+    assert b"ES" in r.data
+    imp = c.post("/api/trades/import", json={"csv": "instrument,pnl\nMNQ,25\nNQ,-10\n"}).get_json()
+    assert imp["ok"] and imp["agregadas"] == 2
+    assert len(c.get("/api/trades?n=50").get_json()["ops"]) == 3
+
+
 # --------------------------- Detalle (R, notas, lado) ---------------------------
 
 def test_registrar_con_detalle():

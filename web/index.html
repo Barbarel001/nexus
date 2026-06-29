@@ -318,6 +318,9 @@
                   style="margin-left:auto;background:var(--panel-2);border:1px solid var(--line-2);color:var(--txt);border-radius:8px;font-size:11px;padding:2px 4px">
             <option value="">Todos</option>
           </select>
+          <button class="mini" id="anExport" data-i18n-title="t.csv_exp" title="Exportar CSV">⬇</button>
+          <button class="mini" id="anImport" data-i18n-title="t.csv_imp" title="Importar CSV">⬆</button>
+          <input id="anCsvFile" type="file" accept=".csv,text/csv" style="display:none">
           <button class="mini" id="anRefresh" title="Actualizar">↻</button>
         </div>
         <div class="card">
@@ -539,6 +542,7 @@ const I18N = {
     'online':'En línea', 'hist':'Historial',
     't.news':'Noticias de mercado', 't.clima':'Clima', 't.gastos':'Gastos del mes',
     't.refresh':'Actualizar', 't.close':'Cerrar', 't.diario':'Diario de trading',
+    't.csv_exp':'Exportar operaciones a CSV', 't.csv_imp':'Importar operaciones desde CSV',
     'tab.pend':'Pendientes', 'tab.hoy':'Hoy', 'tab.venc':'Vencidas',
     'ph.tarea':"Nueva tarea (añade 'hoy' o 'manana')", 'ph.mem':'Recordar algo nuevo…',
     'onb.skip':'No mostrar más', 'onb.ok':'Entendido',
@@ -562,6 +566,7 @@ const I18N = {
     'online':'Online', 'hist':'History',
     't.news':'Market news', 't.clima':'Weather', 't.gastos':'This month’s expenses',
     't.refresh':'Refresh', 't.close':'Close', 't.diario':'Trading journal',
+    't.csv_exp':'Export trades to CSV', 't.csv_imp':'Import trades from CSV',
     'tab.pend':'Pending', 'tab.hoy':'Today', 'tab.venc':'Overdue',
     'ph.tarea':"New task (add 'today' or 'tomorrow')", 'ph.mem':'Remember something new…',
     'onb.skip':'Don’t show again', 'onb.ok':'Got it',
@@ -1197,6 +1202,20 @@ document.getElementById('tareaAdd').addEventListener('click', addTarea);
 document.getElementById('anAdd').addEventListener('click', addTrade);
 document.getElementById('anRefresh').addEventListener('click', refreshAnalitica);
 document.getElementById('anFiltro').addEventListener('change', refreshAnalitica);
+document.getElementById('anExport').addEventListener('click', () => { window.location = '/api/trades/export.csv'; });
+document.getElementById('anImport').addEventListener('click', () => document.getElementById('anCsvFile').click());
+document.getElementById('anCsvFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if(!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  try{
+    const r = await fetch('/api/trades/import', {method:'POST', body: fd});
+    const d = await r.json();
+    if(d.ok) toast((LANG==='en'?'Imported ':'Importadas ')+d.agregadas+(d.errores?(' · '+d.errores+(LANG==='en'?' errors':' errores')):''), 'ok');
+    else toast(d.error||'Error', 'err');
+    refreshAnalitica();
+  }catch(_){ toast('Error', 'err'); }
+  e.target.value = '';
+});
 document.getElementById('anPnl').addEventListener('keydown', e => { if(e.key==='Enter') addTrade(); });
 document.getElementById('rCalc').addEventListener('click', calcRiesgo);
 document.getElementById('tareaInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addTarea(); } });
