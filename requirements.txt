@@ -1,4 +1,4 @@
-anthropic>=0.40
+anthropic>=0.113.0
 flask>=3.0
 
 # Opcionales (instálalos solo si usas estas funciones):
