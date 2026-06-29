@@ -34,33 +34,71 @@
 </head>
 <body>
  <div class="box">
-   <h1>Mi cuenta</h1>
-   <div class="sub">Perfil y datos</div>
+   <h1 data-i18n="h1">Mi cuenta</h1>
+   <div class="sub" data-i18n="sub">Perfil y datos</div>
 
-   <div class="perfil" id="perfil">Cargando…</div>
+   <div class="perfil" id="perfil" data-i18n="loading">Cargando…</div>
 
-   <h2>🔑 Cambiar contraseña</h2>
-   <input id="pwActual" type="password" placeholder="Contraseña actual" autocomplete="current-password">
-   <input id="pwNueva" type="password" placeholder="Nueva contraseña (mín. 6)" autocomplete="new-password">
-   <button id="btnPw" class="primary">Actualizar contraseña</button>
+   <h2 data-i18n="h2pw">🔑 Cambiar contraseña</h2>
+   <input id="pwActual" type="password" data-i18n-ph="ph_actual" placeholder="Contraseña actual" autocomplete="current-password">
+   <input id="pwNueva" type="password" data-i18n-ph="ph_nueva" placeholder="Nueva contraseña (mín. 6)" autocomplete="new-password">
+   <button id="btnPw" class="primary" data-i18n="btnPw">Actualizar contraseña</button>
    <div id="msgPw" class="msg"></div>
 
-   <h2>📦 Mis datos</h2>
-   <button id="btnExport" class="ghost">Exportar todos mis datos (JSON)</button>
+   <h2 data-i18n="h2datos">📦 Mis datos</h2>
+   <button id="btnExport" class="ghost" data-i18n="btnExport">Exportar todos mis datos (JSON)</button>
 
-   <h2>🗑️ Eliminar cuenta</h2>
+   <h2 data-i18n="h2del">🗑️ Eliminar cuenta</h2>
    <div class="peligro">
-     <p>Esto borra <b>para siempre</b> tu cuenta y todos tus datos (memoria, tareas,
+     <p data-i18n="del_p">Esto borra para siempre tu cuenta y todos tus datos (memoria, tareas,
         alertas, gastos, operaciones y conversaciones). No se puede deshacer.</p>
-     <input id="pwBorrar" type="password" placeholder="Confirma con tu contraseña" autocomplete="current-password">
-     <button id="btnBorrar" class="danger">Eliminar mi cuenta definitivamente</button>
+     <input id="pwBorrar" type="password" data-i18n-ph="ph_borrar" placeholder="Confirma con tu contraseña" autocomplete="current-password">
+     <button id="btnBorrar" class="danger" data-i18n="btnBorrar">Eliminar mi cuenta definitivamente</button>
      <div id="msgBorrar" class="msg"></div>
    </div>
 
-   <a class="volver" href="/">← Volver a Nexus</a>
+   <a class="volver" href="/" data-i18n="volver">← Volver a Nexus</a>
  </div>
 
 <script>
+// i18n: usa el idioma elegido en el HUD (localStorage) o el del navegador.
+const I18N = {
+  es: {
+    h1:"Mi cuenta", sub:"Perfil y datos", loading:"Cargando…",
+    h2pw:"🔑 Cambiar contraseña", ph_actual:"Contraseña actual", ph_nueva:"Nueva contraseña (mín. 6)",
+    btnPw:"Actualizar contraseña", h2datos:"📦 Mis datos", btnExport:"Exportar todos mis datos (JSON)",
+    h2del:"🗑️ Eliminar cuenta",
+    del_p:"Esto borra para siempre tu cuenta y todos tus datos (memoria, tareas, alertas, gastos, operaciones y conversaciones). No se puede deshacer.",
+    ph_borrar:"Confirma con tu contraseña", btnBorrar:"Eliminar mi cuenta definitivamente", volver:"← Volver a Nexus",
+    nodisp:"No disponible.", lbl_email:"Email", lbl_plan:"Plan", lbl_alta:"Alta", lbl_2fa:"2FA",
+    on:"activado ✅", off:"desactivado", gestionar:"gestionar",
+    ok_pw:"✓ Contraseña actualizada", error:"Error",
+    confirm_del:"¿Seguro? Esto elimina tu cuenta y TODOS tus datos para siempre.",
+    deleted:"Cuenta eliminada. Hasta pronto.",
+  },
+  en: {
+    h1:"My account", sub:"Profile & data", loading:"Loading…",
+    h2pw:"🔑 Change password", ph_actual:"Current password", ph_nueva:"New password (min. 6)",
+    btnPw:"Update password", h2datos:"📦 My data", btnExport:"Export all my data (JSON)",
+    h2del:"🗑️ Delete account",
+    del_p:"This permanently deletes your account and all your data (memory, tasks, alerts, expenses, trades and conversations). It can't be undone.",
+    ph_borrar:"Confirm with your password", btnBorrar:"Delete my account permanently", volver:"← Back to Nexus",
+    nodisp:"Not available.", lbl_email:"Email", lbl_plan:"Plan", lbl_alta:"Joined", lbl_2fa:"2FA",
+    on:"enabled ✅", off:"disabled", gestionar:"manage",
+    ok_pw:"✓ Password updated", error:"Error",
+    confirm_del:"Are you sure? This deletes your account and ALL your data forever.",
+    deleted:"Account deleted. See you soon.",
+  },
+};
+let LANG = localStorage.getItem('nexus_lang') || (navigator.language || 'es').slice(0,2).toLowerCase();
+if(LANG !== 'en') LANG = 'es';
+function t(k){ return (I18N[LANG] && I18N[LANG][k]) || I18N.es[k] || k; }
+function applyI18n(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n')));
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-ph')));
+}
+
 function csrfToken(){ const m=document.cookie.match(/(?:^|;\s*)nexus_csrf=([^;]+)/); return m?decodeURIComponent(m[1]):""; }
 async function api(url, body){
   const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":csrfToken()},
@@ -68,30 +106,31 @@ async function api(url, body){
   return r.json();
 }
 const $ = id => document.getElementById(id);
-function msg(el,t,ok){ el.textContent=t; el.className="msg "+(ok?"ok":"err"); }
+function msg(el,txt,ok){ el.textContent=txt; el.className="msg "+(ok?"ok":"err"); }
 
 async function cargar(){
-  const r = await fetch("/api/cuenta"); if(!r.ok){ $("perfil").textContent="No disponible."; return; }
+  const r = await fetch("/api/cuenta"); if(!r.ok){ $("perfil").textContent=t("nodisp"); return; }
   const d = await r.json();
   $("perfil").innerHTML =
-    "Email: <b>"+(d.email||"—")+"</b><br>"+
-    "Plan: <span class='chip'>"+(d.plan||"free")+"</span><br>"+
-    "Alta: <b>"+(d.creado||"—")+"</b><br>"+
-    "2FA: <b>"+(d.twofa?"activado ✅":"desactivado")+"</b> · <a href='/seguridad' style='color:#38bdf8'>gestionar</a>";
+    t("lbl_email")+": <b>"+(d.email||"—")+"</b><br>"+
+    t("lbl_plan")+": <span class='chip'>"+(d.plan||"free")+"</span><br>"+
+    t("lbl_alta")+": <b>"+(d.creado||"—")+"</b><br>"+
+    t("lbl_2fa")+": <b>"+(d.twofa?t("on"):t("off"))+"</b> · <a href='/seguridad' style='color:#38bdf8'>"+t("gestionar")+"</a>";
 }
 
 $("btnPw").onclick = async () => {
   const r = await api("/api/cuenta/password", {actual:$("pwActual").value, nueva:$("pwNueva").value});
-  if(r.ok){ msg($("msgPw"),"✓ Contraseña actualizada",true); $("pwActual").value=$("pwNueva").value=""; }
-  else msg($("msgPw"), r.error||"Error", false);
+  if(r.ok){ msg($("msgPw"),t("ok_pw"),true); $("pwActual").value=$("pwNueva").value=""; }
+  else msg($("msgPw"), r.error||t("error"), false);
 };
 $("btnExport").onclick = () => { window.location = "/api/cuenta/exportar"; };
 $("btnBorrar").onclick = async () => {
-  if(!confirm("¿Seguro? Esto elimina tu cuenta y TODOS tus datos para siempre."))return;
+  if(!confirm(t("confirm_del")))return;
   const r = await api("/api/cuenta/borrar", {password:$("pwBorrar").value});
-  if(r.ok){ alert("Cuenta eliminada. Hasta pronto."); window.location="/login"; }
-  else msg($("msgBorrar"), r.error||"Error", false);
+  if(r.ok){ alert(t("deleted")); window.location="/login"; }
+  else msg($("msgBorrar"), r.error||t("error"), false);
 };
+applyI18n();
 cargar();
 </script>
 </body>
