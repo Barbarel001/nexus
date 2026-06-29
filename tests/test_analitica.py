@@ -117,3 +117,18 @@ def test_trades_web(monkeypatch, tmp_path):
     # calculadora de riesgo
     r = c.get("/api/riesgo?saldo=10000&riesgo_pct=1&entrada=100&stop=95").get_json()
     assert r["ok"] and r["resultado"]["contratos"] == 20
+
+
+def test_trades_listar_y_eliminar_web(monkeypatch, tmp_path):
+    import nexus_web
+    monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", False)
+    monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "")
+    monkeypatch.setattr(A, "OPS_PATH", str(tmp_path / "ops_le.json"))
+    c = nexus_web.app.test_client()
+    c.post("/api/trade", json={"instrument": "ES", "pnl": 100})
+    c.post("/api/trade", json={"instrument": "NQ", "pnl": -30})
+    ops = c.get("/api/trades?n=5").get_json()["ops"]
+    assert len(ops) == 2 and ops[0]["instrument"] == "NQ"   # más reciente primero
+    r = c.post("/api/trade/eliminar", json={"ref": ops[0]["id"]}).get_json()
+    assert r["ok"] is True
+    assert len(c.get("/api/trades").get_json()["ops"]) == 1
