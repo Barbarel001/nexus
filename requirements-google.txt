@@ -1,5 +1,5 @@
 # Dependencias OPCIONALES para la integracion con Google (Calendar + Gmail).
 # Instala solo si vas a usar esa funcion:  pip install -r requirements-google.txt
-google-api-python-client>=2.0
+google-api-python-client>=2.198.0
 google-auth-oauthlib>=1.0
 google-auth>=2.0
