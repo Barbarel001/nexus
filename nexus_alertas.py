@@ -17,14 +17,13 @@ Configurable:
     NEXUS_ALERTAS_PATH   Ruta del archivo de alertas.
 """
 
-import os
-import json
-import uuid
 import datetime
+import os
+import uuid
 
-import nexus_util
 import nexus_ctx
 import nexus_ninjatrader as nt
+import nexus_util
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 ALERTAS_PATH = os.environ.get("NEXUS_ALERTAS_PATH") or os.path.join(_CARPETA, "alertas.json")

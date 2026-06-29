@@ -8,7 +8,6 @@ import urllib.request
 import nexus
 import nexus_web
 
-
 # --------------------------- Memoria persistente ---------------------------
 
 def test_guardar_y_cargar_memoria(tmp_path, monkeypatch):

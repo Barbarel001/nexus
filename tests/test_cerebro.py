@@ -4,11 +4,8 @@ compatibilidad hacia atras) y RAG-lite sobre documentos."""
 
 import json
 
-import pytest
-
 import nexus
 import nexus_docs as docs
-
 
 # --------------------------- Memoria: compatibilidad ---------------------------
 

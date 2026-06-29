@@ -17,11 +17,11 @@ Requisitos:
   y una API key de Anthropic en la variable de entorno ANTHROPIC_API_KEY.
 """
 
+import datetime
+import json
 import os
 import sys
-import json
 import uuid
-import datetime
 
 # Hacer que la salida soporte acentos/emoji en la terminal de Windows.
 try:
@@ -34,18 +34,18 @@ try:
 except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
-import nexus_util  # utilidades base (escritura atomica, logging)
-import nexus_ctx  # contexto de usuario (aislamiento de datos multiusuario)
-import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
-import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
-import nexus_docs as docs  # RAG-lite sobre documentos del usuario
-import nexus_noticias as noticias  # titulares de mercado (RSS)
-import nexus_gastos as gastos  # control de gastos personales
-import nexus_clima as clima  # clima (Open-Meteo, gratis)
-import nexus_google as google  # Google Calendar + Gmail (opcional)
+import nexus_analitica as analitica  # analitica de trading (stats, equity, riesgo)
 import nexus_backtest as backtest  # backtesting de estrategias
-
+import nexus_clima as clima  # clima (Open-Meteo, gratis)
+import nexus_ctx  # contexto de usuario (aislamiento de datos multiusuario)
+import nexus_docs as docs  # RAG-lite sobre documentos del usuario
+import nexus_gastos as gastos  # control de gastos personales
+import nexus_google as google  # Google Calendar + Gmail (opcional)
+import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
+import nexus_noticias as noticias  # titulares de mercado (RSS)
+import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
+import nexus_util  # utilidades base (escritura atomica, logging)
 
 # ============================================================
 #  CONFIGURACION  (cambia estas variables a tu gusto)
@@ -377,6 +377,7 @@ TOOLS += gastos.GASTOS_TOOLS
 TOOLS += clima.CLIMA_TOOLS
 TOOLS += google.GOOGLE_TOOLS
 TOOLS += backtest.BACKTEST_TOOLS
+TOOLS += analitica.ANALITICA_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero, tocan el
 # sistema o hacen acciones externas): piden confirmacion en la terminal y van detras
@@ -423,8 +424,8 @@ def tool_olvidar_memoria(args: dict) -> str:
 def tool_rastrear_ofertas(args: dict) -> str:
     """Descarga ofertas reales de varias fuentes (Remotive, RemoteOK, Arbeitnow) y
     las filtra por palabras clave, DEDUPLICANDO por URL para no repetir."""
-    import urllib.request
     import urllib.parse
+    import urllib.request
     consulta = (args.get("palabras_clave") or "python").strip()
     palabras = [p.lower() for p in consulta.split() if p]
     headers = {"User-Agent": "Mozilla/5.0 (NEXUS-job-tracker)"}
@@ -641,6 +642,7 @@ EJECUTORES.update(noticias.NEWS_EJECUTORES)
 EJECUTORES.update(gastos.GASTOS_EJECUTORES)
 EJECUTORES.update(clima.CLIMA_EJECUTORES)
 EJECUTORES.update(backtest.BACKTEST_EJECUTORES)
+EJECUTORES.update(analitica.ANALITICA_EJECUTORES)
 # Google: lectura directa; acciones (crear evento / enviar correo) con confirmacion.
 EJECUTORES.update({
     "google_agenda": google.GOOGLE_EJECUTORES["google_agenda"],
@@ -736,6 +738,43 @@ def analizar_imagen(image_b64: str, media_type: str = "image/jpeg",
     texto = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
     usage = {"in": resp.usage.input_tokens, "out": resp.usage.output_tokens} if getattr(resp, "usage", None) else {"in": 0, "out": 0}
     return texto.strip(), usage
+
+
+# ============================================================
+#  RESUMEN DE CONVERSACIONES  (cerebro: condensar charlas largas)
+# ============================================================
+
+def _completar_simple(prompt: str, model: str = None) -> str:
+    """Una sola respuesta de texto del modelo (sin herramientas). Para resumenes.
+    Usa Ollama si el backend es local; si no, la API de Claude."""
+    if BACKEND == "ollama":
+        import urllib.request
+
+        import nexus_ollama
+        payload = {"model": nexus_ollama.OLLAMA_MODEL, "prompt": prompt, "stream": False}
+        req = urllib.request.Request(
+            nexus_ollama.OLLAMA_HOST + "/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode("utf-8", "replace")).get("response", "").strip()
+    client = anthropic.Anthropic()
+    resp = client.messages.create(model=model or MODEL, max_tokens=1024,
+                                  messages=[{"role": "user", "content": prompt}])
+    return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+
+
+def resumir_texto(texto: str, completar=None) -> str:
+    """Resume una conversacion (o cualquier texto) en titulo + viñetas. `completar`
+    es inyectable para tests; por defecto llama al modelo."""
+    texto = (texto or "").strip()
+    if not texto:
+        return ""
+    completar = completar or _completar_simple
+    prompt = ("Resume esta conversacion de forma breve y util, en español. Empieza con un "
+              "titulo de una linea y despues 3-6 viñetas con lo esencial (decisiones, datos "
+              "y tareas pendientes). Se concreto:\n\n" + texto)
+    return completar(prompt)
 
 
 # ============================================================

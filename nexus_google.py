@@ -23,9 +23,9 @@ Configuracion:
     NEXUS_GOOGLE_TOKEN         Ruta del token.json (defecto: token.json).
 """
 
-import os
 import base64
 import datetime
+import os
 from email.mime.text import MIMEText
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -44,8 +44,8 @@ _AYUDA = ("Google no esta configurado. Instala 'pip install -r requirements-goog
 
 def librerias_ok() -> bool:
     try:
-        import googleapiclient  # noqa: F401
         import google_auth_oauthlib  # noqa: F401
+        import googleapiclient  # noqa: F401
         return True
     except ImportError:
         return False
@@ -57,8 +57,8 @@ def configurado() -> bool:
 
 
 def _credenciales():
-    from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
     creds = Credentials.from_authorized_user_file(TOKEN, SCOPES) if os.path.isfile(TOKEN) else None
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())

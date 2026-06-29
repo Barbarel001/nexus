@@ -16,21 +16,21 @@ Configuracion:
     NEXUS_SCHED_INTERVALO        Segundos entre comprobaciones (defecto 60).
 """
 
-import os
-import time
 import datetime
+import os
 import threading
+import time
 
 import nexus
-import nexus_util
 import nexus_alertas as alertas
-import nexus_tareas as tareas
+import nexus_clima as clima
+import nexus_discord as discord
 import nexus_gastos as gastos
 import nexus_ninjatrader as nt
-import nexus_telegram as telegram
-import nexus_discord as discord
 import nexus_noticias as noticias
-import nexus_clima as clima
+import nexus_tareas as tareas
+import nexus_telegram as telegram
+import nexus_util
 
 BRIEFING_HORA = nexus._env("NEXUS_BRIEFING_HORA", "")           # "08:00" o vacio
 INSTRUMENTOS = [s.strip().upper() for s in nexus._env("NEXUS_BRIEFING_INSTRUMENTOS", "").split(",") if s.strip()]

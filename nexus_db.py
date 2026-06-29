@@ -14,12 +14,12 @@ Configuracion:
     NEXUS_DB_PATH   Ruta del archivo SQLite (defecto: nexus.db junto a este script).
 """
 
-import os
-import json
-import sqlite3
-import hashlib
-import secrets
 import datetime
+import hashlib
+import json
+import os
+import secrets
+import sqlite3
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("NEXUS_DB_PATH") or os.path.join(_CARPETA, "nexus.db")
@@ -122,6 +122,28 @@ def usuario_por_email(email: str):
         row = c.execute("SELECT id, email, plan, creado FROM users WHERE email=?",
                         (_normalizar_email(email),)).fetchone()
     return dict(row) if row else None
+
+
+def cambiar_password(user_id: int, password_actual: str, password_nuevo: str) -> None:
+    """Cambia la contraseña validando la actual. Lanza ValueError si algo falla."""
+    init()
+    with _conn() as c:
+        row = c.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row or not _verificar_password(password_actual, row["password_hash"]):
+        raise ValueError("La contraseña actual no es correcta.")
+    if len((password_nuevo or "")) < 6:
+        raise ValueError("La nueva contraseña debe tener al menos 6 caracteres.")
+    with _conn() as c:
+        c.execute("UPDATE users SET password_hash=? WHERE id=?",
+                  (_hash_password(password_nuevo), user_id))
+
+
+def borrar_usuario(user_id: int) -> None:
+    """Elimina el usuario y todos sus datos en la BD (no toca archivos en disco)."""
+    init()
+    with _conn() as c:
+        c.execute("DELETE FROM user_data WHERE user_id=?", (user_id,))
+        c.execute("DELETE FROM users WHERE id=?", (user_id,))
 
 
 def cambiar_plan(user_id: int, plan: str) -> None:

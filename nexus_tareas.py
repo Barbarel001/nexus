@@ -16,13 +16,12 @@ Configurable por entorno:
     NEXUS_TAREAS_PATH   Ruta del archivo de tareas (defecto: tareas.json junto a este script).
 """
 
-import os
-import json
-import uuid
 import datetime
+import os
+import uuid
 
-import nexus_util
 import nexus_ctx
+import nexus_util
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 TAREAS_PATH = os.environ.get("NEXUS_TAREAS_PATH") or os.path.join(CARPETA, "tareas.json")

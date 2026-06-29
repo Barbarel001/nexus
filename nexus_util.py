@@ -10,11 +10,11 @@ evitar imports circulares).
 - log: registro simple de eventos/errores a un archivo (y a consola).
 """
 
-import os
+import datetime
 import json
+import os
 import shutil
 import tempfile
-import datetime
 
 LOG_PATH = os.environ.get("NEXUS_LOG") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "nexus.log")

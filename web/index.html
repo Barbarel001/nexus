@@ -266,6 +266,7 @@
           <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
           <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
           <a class="btn-ic" id="secBtn" href="/seguridad" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
+          <a class="btn-ic" id="cuentaBtn" href="/cuenta" title="Mi cuenta" style="display:none;align-items:center">👤</a>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -308,6 +309,33 @@
           <input id="watchInp" placeholder="Añadir instrumento (ej. ES 12-25)" autocomplete="off" />
           <button id="watchAdd" title="Añadir">＋</button>
         </div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h">📊 Analítica <button class="mini" id="anRefresh" title="Actualizar">↻</button></div>
+        <div class="card">
+          <div class="nt-sum" id="anStats">Sin operaciones aún.</div>
+          <canvas id="anEquity" height="44" style="width:100%;margin-top:8px;display:none"></canvas>
+        </div>
+        <div class="add-row">
+          <input id="anInst" placeholder="Instrumento" autocomplete="off" />
+          <input id="anPnl" placeholder="Resultado $ (+/-)" inputmode="decimal" autocomplete="off" />
+          <button id="anAdd" title="Registrar operación">＋</button>
+        </div>
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--txt-faint)">🧮 Calculadora de riesgo</summary>
+          <div class="add-row" style="margin-top:6px">
+            <input id="rSaldo" placeholder="Saldo" inputmode="decimal" autocomplete="off"/>
+            <input id="rPct" placeholder="% riesgo" inputmode="decimal" autocomplete="off"/>
+          </div>
+          <div class="add-row" style="margin-top:6px">
+            <input id="rEnt" placeholder="Entrada" inputmode="decimal" autocomplete="off"/>
+            <input id="rStop" placeholder="Stop" inputmode="decimal" autocomplete="off"/>
+            <input id="rVpp" placeholder="$/punto" inputmode="decimal" autocomplete="off"/>
+            <button id="rCalc" title="Calcular">=</button>
+          </div>
+          <div id="rOut" style="font-size:11px;color:var(--txt-faint);margin-top:6px"></div>
+        </details>
       </div>
 
       <div class="sect">
@@ -900,6 +928,54 @@ async function refreshPanel(){
   }catch(_){ }
   refreshAlertas();
   refreshPrecios();
+  refreshAnalitica();
+}
+
+/* ---------- Analítica de trading ---------- */
+function fmtMoney(v){ return (v<0?'-$':'$') + Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:2}); }
+async function refreshAnalitica(){
+  try{
+    const r = await fetch('/api/trades/stats'); if(!r.ok) return;
+    const d = await r.json(); const s = d.stats || {};
+    const el = document.getElementById('anStats');
+    if(!s.n){ el.textContent = 'Sin operaciones aún.'; document.getElementById('anEquity').style.display='none'; return; }
+    const pf = s.profit_factor_infinito ? '∞' : (s.profit_factor ?? '—');
+    const col = s.pnl_total>=0 ? 'var(--ok,#34d399)' : 'var(--bad,#f87171)';
+    el.innerHTML =
+      '<div style="font-size:18px;font-weight:600;color:'+col+'">'+fmtMoney(s.pnl_total)+'</div>'+
+      '<div style="font-size:11px;color:var(--txt-faint);line-height:1.6;margin-top:2px">'+
+      'Win '+s.win_rate+'% · PF '+pf+' · Exp '+fmtMoney(s.expectancy)+'<br>'+
+      s.n+' ops · '+s.ganadoras+'G/'+s.perdedoras+'P · DD '+fmtMoney(s.max_drawdown)+' · racha '+(s.racha>0?'+':'')+s.racha+'</div>';
+    dibujarEquity(d.equity || []);
+  }catch(_){ }
+}
+function dibujarEquity(serie){
+  const cv = document.getElementById('anEquity'); if(!serie.length){ cv.style.display='none'; return; }
+  cv.style.display='block';
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = 44;
+  cv.width = w*dpr; cv.height = h*dpr; const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr);
+  const min = Math.min(0,...serie), max = Math.max(0,...serie), rng = (max-min)||1;
+  const x = i => serie.length<2 ? w/2 : (i/(serie.length-1))*w;
+  const y = v => h-2 - ((v-min)/rng)*(h-4);
+  ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(w, y(0));
+  ctx.strokeStyle='rgba(148,163,184,.25)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.beginPath(); serie.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); });
+  ctx.strokeStyle = serie[serie.length-1]>=0 ? '#34d399' : '#f87171'; ctx.lineWidth=2; ctx.stroke();
+}
+async function addTrade(){
+  const inst = document.getElementById('anInst').value.trim();
+  const pnl = document.getElementById('anPnl').value.trim();
+  if(!inst || pnl===''){ return; }
+  const r = await fetch('/api/trade', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({instrument: inst, pnl: parseFloat(pnl)})});
+  if((await r.json()).ok){ document.getElementById('anInst').value=''; document.getElementById('anPnl').value=''; refreshAnalitica(); }
+}
+async function calcRiesgo(){
+  const q = new URLSearchParams({saldo:rSaldo.value, riesgo_pct:rPct.value, entrada:rEnt.value, stop:rStop.value, valor_por_punto:(rVpp.value||1)});
+  const r = await fetch('/api/riesgo?'+q.toString()); const d = await r.json();
+  document.getElementById('rOut').textContent = d.ok
+    ? '→ '+d.resultado.contratos+' contrato(s) · riesgo real '+fmtMoney(d.resultado.riesgo_real)
+    : ('⚠️ '+(d.error||'datos inválidos'));
 }
 function renderNT(nt){
   const st = document.getElementById('ntStatus'), ac = document.getElementById('ntAcct');
@@ -947,6 +1023,10 @@ async function addTarea(){
   i.value = ''; refreshPanel();
 }
 document.getElementById('tareaAdd').addEventListener('click', addTarea);
+document.getElementById('anAdd').addEventListener('click', addTrade);
+document.getElementById('anRefresh').addEventListener('click', refreshAnalitica);
+document.getElementById('anPnl').addEventListener('keydown', e => { if(e.key==='Enter') addTrade(); });
+document.getElementById('rCalc').addEventListener('click', calcRiesgo);
 document.getElementById('tareaInp').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addTarea(); } });
 
 /* ---- Watchlist con variación e histórico (sparkline) ---- */
@@ -1248,7 +1328,8 @@ if('serviceWorker' in navigator){
   aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   if(cfg.admin){ const ab = document.getElementById('adminBtn'); if(ab) ab.style.display = 'flex'; }
-  if(cfg.multiuser){ const sb = document.getElementById('secBtn'); if(sb) sb.style.display = 'flex'; }
+  if(cfg.multiuser){ const sb = document.getElementById('secBtn'); if(sb) sb.style.display = 'flex';
+                     const cb = document.getElementById('cuentaBtn'); if(cb) cb.style.display = 'flex'; }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado
   arrancarPanel();

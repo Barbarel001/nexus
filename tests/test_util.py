@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests de las utilidades base: escritura atomica de JSON, lectura tolerante y log."""
 
-import json
 import os
 
 import nexus_util

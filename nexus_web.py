@@ -20,42 +20,45 @@ con la variable de entorno NEXUS_WEB_ACCIONES=1: en ese caso CADA accion peligro
 requiere tu aprobacion explicita en un modal de confirmacion del navegador.
 """
 
-import os
-import sys
+import datetime
 import json
+import os
+import secrets
+import sys
+import threading
 import time
 import uuid
-import secrets
-import datetime
-import threading
 
 try:
     import anthropic  # noqa: F401
 except ImportError:
     sys.exit("Falta 'anthropic'. Ejecuta: pip install anthropic")
 import hmac
+
 try:
-    from flask import (Flask, request, Response, send_from_directory, jsonify,
-                       session, redirect, render_template_string)
+    from flask import Flask, Response, jsonify, redirect, render_template_string, request, send_from_directory, session
 except ImportError:
     sys.exit("Falta 'flask'. Ejecuta: pip install flask")
 
 import anthropic
-import nexus_util  # escritura atomica / logging
-import nexus_ctx  # contexto de usuario (aislamiento de datos)
-import nexus_totp  # 2FA (TOTP) en Python puro
+
 import nexus  # reutilizamos toda la logica del Nexus de terminal
-import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
-import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
-import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_alertas as alertas  # alertas de precio
-import nexus_docs as docs  # RAG-lite sobre documentos
-import nexus_noticias as noticias  # titulares de mercado
-import nexus_gastos as gastos  # control de gastos
-import nexus_clima as clima  # clima
-import nexus_google as google  # Google Calendar + Gmail
+import nexus_analitica as analitica  # analitica de trading (stats / equity / riesgo)
 import nexus_backtest as backtest  # backtesting
+import nexus_clima as clima  # clima
+import nexus_ctx  # contexto de usuario (aislamiento de datos)
+import nexus_db  # cuentas / SQLite (modo multiusuario)
+import nexus_docs as docs  # RAG-lite sobre documentos
+import nexus_gastos as gastos  # control de gastos
+import nexus_google as google  # Google Calendar + Gmail
+import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
+import nexus_noticias as noticias  # titulares de mercado
+import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
+import nexus_tareas as tareas  # productividad (tareas/recordatorios)
+import nexus_totp  # 2FA (TOTP) en Python puro
+import nexus_util  # escritura atomica / logging
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -67,7 +70,7 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS | analitica.ANALITICA_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -101,7 +104,6 @@ NEXUS_PASSWORD = nexus._env("NEXUS_PASSWORD", "")
 # Modo MULTIUSUARIO (SaaS): NEXUS_MULTIUSER=1 activa cuentas (registro/login con
 # email+contraseña) sobre SQLite. Si esta off, se usa el modo de una sola
 # contraseña (NEXUS_PASSWORD) o ninguno (uso local). Opt-in para no romper nada.
-import nexus_db
 NEXUS_MULTIUSER = nexus._env("NEXUS_MULTIUSER", "0").lower() in ("1", "true", "yes", "on")
 if NEXUS_MULTIUSER:
     nexus_db.init()
@@ -190,6 +192,21 @@ def _publicar_csrf(resp):
                             max_age=60 * 60 * 24 * 30)
     except RuntimeError:
         pass  # sin contexto de sesion/peticion
+    return resp
+
+
+# ---------------- Metricas de servicio (observabilidad ligera) -------------
+# Contadores en memoria para vigilar la salud del servicio sin dependencias.
+_METRICAS = {"inicio": time.time(), "peticiones": 0, "errores": 0}
+_lock_metricas = threading.Lock()
+
+
+@app.after_request
+def _contar_metricas(resp):
+    with _lock_metricas:
+        _METRICAS["peticiones"] += 1
+        if resp.status_code >= 500:
+            _METRICAS["errores"] += 1
     return resp
 
 
@@ -590,6 +607,78 @@ def seguridad_page():
     return send_from_directory(WEBDIR, "seguridad.html")
 
 
+# ---------------- Cuenta de usuario (perfil, contraseña, datos) ----------------
+@app.route("/cuenta")
+def cuenta_page():
+    if not _uid_actual():
+        return redirect("/login") if _auth_requerida() else ("La cuenta solo existe en modo multiusuario.", 400)
+    return send_from_directory(WEBDIR, "cuenta.html")
+
+
+@app.route("/api/cuenta")
+def api_cuenta():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"error": "no disponible"}), 400
+    u = nexus_db.obtener_usuario(uid) or {}
+    _, totp_on = nexus_db.get_totp(uid)
+    return jsonify({"email": u.get("email"), "plan": u.get("plan"),
+                    "creado": u.get("creado"), "twofa": totp_on})
+
+
+@app.route("/api/cuenta/password", methods=["POST"])
+def api_cuenta_password():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    try:
+        nexus_db.cambiar_password(uid, body.get("actual", ""), body.get("nueva", ""))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True})
+
+
+def _exportar_datos(uid: int) -> dict:
+    """Reúne todos los datos del usuario (el contexto ya está fijado en before_request)."""
+    return {
+        "exportado": datetime.datetime.now().isoformat(timespec="seconds"),
+        "perfil": nexus_db.obtener_usuario(uid),
+        "memoria": nexus.cargar_notas(),
+        "tareas": tareas.cargar(),
+        "alertas": alertas.cargar(),
+        "gastos": gastos.cargar(),
+        "operaciones": analitica.cargar(),
+        "conversaciones": cargar_convs().get("convs", []),
+    }
+
+
+@app.route("/api/cuenta/exportar")
+def api_cuenta_exportar():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"error": "no disponible"}), 400
+    datos = json.dumps(_exportar_datos(uid), ensure_ascii=False, indent=2)
+    return Response(datos, mimetype="application/json", headers={
+        "Content-Disposition": "attachment; filename=nexus-mis-datos.json"})
+
+
+@app.route("/api/cuenta/borrar", methods=["POST"])
+def api_cuenta_borrar():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    # Exige reautenticación con la contraseña antes de un borrado irreversible.
+    u = nexus_db.obtener_usuario(uid)
+    if not (u and nexus_db.autenticar(u["email"], body.get("password", ""))):
+        return jsonify({"ok": False, "error": "contraseña incorrecta"}), 400
+    nexus_ctx.borrar_datos(uid)      # archivos en disco
+    nexus_db.borrar_usuario(uid)     # fila en la BD
+    session.clear()
+    return jsonify({"ok": True})
+
+
 def _es_admin() -> bool:
     """True si el usuario actual es administrador (multiusuario + email en la lista)."""
     return bool(NEXUS_MULTIUSER and NEXUS_ADMIN_EMAIL
@@ -638,6 +727,25 @@ def admin_plan():
 def health():
     """Endpoint de salud para balanceadores/monitores de uptime (publico)."""
     return jsonify({"ok": True, "service": "nexus", "multiuser": NEXUS_MULTIUSER})
+
+
+@app.route("/api/metrics")
+def metrics():
+    """Metricas de servicio (uptime, peticiones, errores). Gated por admin si hay login."""
+    if _auth_requerida() and not _es_admin():
+        return jsonify({"error": "no autorizado"}), 403
+    with _lock_metricas:
+        m = dict(_METRICAS)
+    datos = {
+        "uptime_segundos": int(time.time() - m["inicio"]),
+        "peticiones": m["peticiones"],
+        "errores": m["errores"],
+        "backend": nexus.BACKEND,
+        "multiuser": NEXUS_MULTIUSER,
+    }
+    if NEXUS_MULTIUSER:
+        datos["usuarios"] = nexus_db.contar_usuarios()
+    return jsonify(datos)
 
 
 @app.route("/api/stripe/webhook", methods=["POST"])
@@ -742,6 +850,43 @@ def gasto_agregar_api():
     return jsonify({"ok": True, "gasto": g})
 
 
+@app.route("/api/trades/stats")
+def trades_stats_api():
+    """Estadisticas de trading + curva de equity para el panel."""
+    import math as _math
+    s = analitica.estadisticas()
+    if s.get("profit_factor") == _math.inf:   # JSON no admite Infinity: lo marcamos aparte
+        s["profit_factor"] = None
+        s["profit_factor_infinito"] = True
+    return jsonify({"stats": s, "equity": analitica.curva_equity()})
+
+
+@app.route("/api/trade", methods=["POST"])
+def trade_agregar_api():
+    """Registra una operacion cerrada (con su resultado) desde el panel."""
+    body = request.get_json(silent=True) or {}
+    try:
+        o = analitica.registrar(body.get("instrument", ""), body.get("pnl"),
+                                body.get("lado", ""), body.get("qty", 0),
+                                body.get("entrada"), body.get("salida"),
+                                body.get("notas", ""), body.get("fecha", ""))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "op": o})
+
+
+@app.route("/api/riesgo")
+def riesgo_api():
+    """Calculadora de tamano de posicion por % de riesgo (para el panel)."""
+    g = request.args.get
+    try:
+        r = analitica.tamano_posicion(g("saldo"), g("riesgo_pct"), g("entrada"),
+                                      g("stop"), g("valor_por_punto", 1.0))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "resultado": r})
+
+
 @app.route("/api/nt/precio")
 def nt_precio_api():
     """Precio de un instrumento via NinjaTrader (para la watchlist del panel)."""
@@ -844,6 +989,23 @@ def renombrar_conv(cid):
     c["titulo"] = titulo
     guardar_convs(data)
     return jsonify({"ok": True, "titulo": titulo})
+
+
+@app.route("/api/conversacion/<cid>/resumen", methods=["POST"])
+def resumir_conv(cid):
+    """Resume una conversacion larga (titulo + viñetas) usando el modelo activo."""
+    data = cargar_convs()
+    c = buscar_conv(data, cid)
+    if not c:
+        return jsonify({"ok": False, "error": "no existe"}), 404
+    texto = "\n".join(f"{t['role']}: {t.get('text', '')}" for t in c.get("turnos", []))
+    if not texto.strip():
+        return jsonify({"ok": False, "error": "conversacion vacia"}), 400
+    try:
+        resumen = nexus.resumir_texto(texto)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({"ok": True, "resumen": resumen})
 
 
 @app.route("/api/nueva", methods=["POST"])
@@ -1095,7 +1257,8 @@ def main():
 def _arrancar_proactivo():
     """Arranca, en hilos daemon, el bot de Telegram y el scheduler si estan configurados."""
     try:
-        import nexus_telegram, nexus_scheduler
+        import nexus_scheduler
+        import nexus_telegram
         if nexus_telegram.configurado():
             threading.Thread(target=nexus_telegram.run, daemon=True, name="nexus-telegram").start()
             nexus_scheduler.iniciar_en_hilo()

@@ -31,16 +31,16 @@ import urllib.parse
 import urllib.request
 
 import nexus
-import nexus_ollama
-import nexus_ninjatrader as nt
-import nexus_tareas as tareas
 import nexus_alertas as alertas
-import nexus_docs as docs
-import nexus_noticias as noticias
-import nexus_gastos as gastos
-import nexus_clima as clima
-import nexus_google as google
 import nexus_backtest as backtest
+import nexus_clima as clima
+import nexus_docs as docs
+import nexus_gastos as gastos
+import nexus_google as google
+import nexus_ninjatrader as nt
+import nexus_noticias as noticias
+import nexus_ollama
+import nexus_tareas as tareas
 
 TOKEN = nexus._env("NEXUS_TELEGRAM_TOKEN", "")
 _API = f"https://api.telegram.org/bot{TOKEN}"

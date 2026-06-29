@@ -3,10 +3,10 @@
 
 import pytest
 
-import nexus_ctx
-import nexus_tareas as tareas
-import nexus_gastos as gastos
 import nexus
+import nexus_ctx
+import nexus_gastos as gastos
+import nexus_tareas as tareas
 
 
 @pytest.fixture(autouse=True)
@@ -68,7 +68,8 @@ def test_memoria_aislada_por_usuario():
 # --------------------------- Integración web ---------------------------
 
 def test_conversaciones_aisladas_web(monkeypatch, tmp_path):
-    import nexus_web, nexus_db
+    import nexus_db
+    import nexus_web
     monkeypatch.setattr(nexus_web, "NEXUS_MULTIUSER", True)
     monkeypatch.setattr(nexus_web, "NEXUS_PASSWORD", "")
     monkeypatch.setattr(nexus_db, "DB_PATH", str(tmp_path / "u.db"))

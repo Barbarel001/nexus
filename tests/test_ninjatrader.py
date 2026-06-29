@@ -9,7 +9,6 @@ import pytest
 import nexus
 import nexus_ninjatrader as nt
 
-
 # --------------------------- Construccion de comandos OIF ---------------------------
 
 def test_construir_place_market():

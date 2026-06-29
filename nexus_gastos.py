@@ -11,12 +11,12 @@ Configuracion:
     NEXUS_MONEDA        Simbolo de moneda para mostrar (defecto '$').
 """
 
+import datetime
 import os
 import uuid
-import datetime
 
-import nexus_util
 import nexus_ctx
+import nexus_util
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 GASTOS_PATH = os.environ.get("NEXUS_GASTOS_PATH") or os.path.join(_CARPETA, "gastos.json")

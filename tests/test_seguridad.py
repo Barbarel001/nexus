@@ -3,10 +3,9 @@
 
 import pytest
 
-import nexus_totp
 import nexus_db
+import nexus_totp
 import nexus_web
-
 
 # --------------------------- TOTP (unidad) ---------------------------
 

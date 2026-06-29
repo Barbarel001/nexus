@@ -14,9 +14,9 @@ Configuracion:
     NEXUS_DOCS_DIR   Carpeta de documentos (defecto: ./documentos junto a este script).
 """
 
+import glob
 import os
 import re
-import glob
 
 import nexus_ctx
 
@@ -113,6 +113,30 @@ def buscar(consulta: str, k: int = 4, carpeta: str = None) -> list:
     return resultados[:k]
 
 
+def buscar_semantica(consulta: str, k: int = 4, carpeta: str = None, embed=None) -> list:
+    """Busqueda por SIGNIFICADO con embeddings (RAG real). Cae a `buscar` (palabras
+    clave) si no hay embeddings disponibles o no devuelven nada. `embed` permite
+    inyectar una funcion de embedding (para tests); por defecto usa nexus_embeddings."""
+    if embed is None:
+        import nexus_embeddings
+        embed = nexus_embeddings.embed if nexus_embeddings.disponible() else None
+    if embed is None:
+        return buscar(consulta, k, carpeta)
+    import nexus_embeddings
+    qv = embed(consulta)
+    if not qv:
+        return buscar(consulta, k, carpeta)
+    items = []
+    for fr in indexar(carpeta):
+        v = embed(fr["texto"])
+        if v:
+            items.append({"archivo": fr["archivo"], "texto": fr["texto"], "vec": v})
+    rankeados = nexus_embeddings.rank(qv, items, key="vec", k=k)
+    if not rankeados:
+        return buscar(consulta, k, carpeta)
+    return [{"archivo": r["archivo"], "texto": r["texto"], "score": r["score"]} for r in rankeados]
+
+
 # ============================================================
 #  HERRAMIENTA  (SEGURA)
 # ============================================================
@@ -124,7 +148,7 @@ def tool_buscar_documentos(args: dict) -> str:
     if not os.path.isdir(_docs_dir()):
         return (f"No hay carpeta de documentos en {_docs_dir()}. Crea la carpeta y pon ahi "
                 "tus .txt, .md o .pdf para que pueda consultarlos.")
-    hits = buscar(consulta)
+    hits = buscar_semantica(consulta)   # semantica si hay embeddings; si no, palabras clave
     if not hits:
         return "No encontre nada relevante en tus documentos para esa consulta."
     out = ["Fragmentos relevantes de tus documentos:"]
