@@ -55,6 +55,7 @@ import nexus_gastos as gastos  # control de gastos
 import nexus_clima as clima  # clima
 import nexus_google as google  # Google Calendar + Gmail
 import nexus_backtest as backtest  # backtesting
+import nexus_analitica as analitica  # analitica de trading (stats / equity / riesgo)
 import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -67,7 +68,7 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS | analitica.ANALITICA_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
@@ -740,6 +741,43 @@ def gasto_agregar_api():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "gasto": g})
+
+
+@app.route("/api/trades/stats")
+def trades_stats_api():
+    """Estadisticas de trading + curva de equity para el panel."""
+    import math as _math
+    s = analitica.estadisticas()
+    if s.get("profit_factor") == _math.inf:   # JSON no admite Infinity: lo marcamos aparte
+        s["profit_factor"] = None
+        s["profit_factor_infinito"] = True
+    return jsonify({"stats": s, "equity": analitica.curva_equity()})
+
+
+@app.route("/api/trade", methods=["POST"])
+def trade_agregar_api():
+    """Registra una operacion cerrada (con su resultado) desde el panel."""
+    body = request.get_json(silent=True) or {}
+    try:
+        o = analitica.registrar(body.get("instrument", ""), body.get("pnl"),
+                                body.get("lado", ""), body.get("qty", 0),
+                                body.get("entrada"), body.get("salida"),
+                                body.get("notas", ""), body.get("fecha", ""))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "op": o})
+
+
+@app.route("/api/riesgo")
+def riesgo_api():
+    """Calculadora de tamano de posicion por % de riesgo (para el panel)."""
+    g = request.args.get
+    try:
+        r = analitica.tamano_posicion(g("saldo"), g("riesgo_pct"), g("entrada"),
+                                      g("stop"), g("valor_por_punto", 1.0))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True, "resultado": r})
 
 
 @app.route("/api/nt/precio")
