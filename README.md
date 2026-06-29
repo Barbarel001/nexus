@@ -65,6 +65,13 @@ It's a compact but complete example of an **agentic application**, demonstrating
 | 📈 **NinjaTrader bridge** | Trade from Nexus via NinjaTrader 8's file-based **AT Interface** (no extra deps): check status, read prices, read positions, **place / cancel / close orders** — every order gated behind explicit confirmation. |
 | 🖥️ **Terminal client** | Full agent with the complete tool set, **streaming** responses and an iteration safety cap per turn. |
 | 🔒 **Safe by default** | Confirms before running commands or writing files; the web UI disables system-level tools unless explicitly opted in. |
+| 📊 **Trading analytics** | Log closed trades (P&L, side, entry/exit, **R-multiple**, notes) and get **win rate, profit factor, expectancy, drawdown, streak, avg R**, an **equity-curve** sparkline, per-instrument breakdown, instrument/date **filters**, a **position-size calculator** by % risk, and **CSV import/export**. Tools: `registrar_trade`, `stats_trading`, `calc_riesgo`. |
+| 🧠 **Semantic RAG + summaries** | Optional **embeddings** via Ollama (`nomic-embed-text`) for meaning-based document search, with graceful **fallback to keyword** when Ollama isn't running; one-tap **conversation summaries** (📝). |
+| 🔐 **Accounts & security** | Multi-user with **per-user data isolation**, **CSRF** tokens on state-changing requests, optional **2FA (TOTP)**, brute-force login limit, PBKDF2 passwords, and `Secure`/`HttpOnly`/`SameSite` cookies. |
+| 👤 **Account & privacy** | `/cuenta` page: profile, **change password**, **export all my data** (JSON) and **delete account** (data portability + right to be forgotten). |
+| 🔔 **Web Push** | Browser notifications **even when the tab is closed** (price alerts, briefing) via VAPID — optional (`pip install pywebpush` + `python nexus_push.py genkeys`). |
+| 🌍 **Bilingual (ES/EN)** | Full i18n across the HUD, login/2FA, security and account pages — language switch in ⚙ Settings with browser auto-detection. |
+| 📈 **Service metrics** | `/api/metrics` (uptime, requests, errors, users) — admin-gated in multi-user mode. |
 
 ## Architecture
 
@@ -425,7 +432,15 @@ never published.
 - [x] Tags, projects and recurring tasks
 - [x] Crash-safe atomic writes, logging, and an always-on launcher
 - [x] NinjaTrader simulation mode + diagnostic CLI
+- [x] Trading analytics (win rate, profit factor, expectancy, drawdown, R, equity curve) + position-size calculator + CSV import/export
+- [x] Semantic RAG via Ollama embeddings (keyword fallback) + conversation summaries
+- [x] SaaS security: per-user data isolation, CSRF tokens, optional 2FA (TOTP)
+- [x] Account & privacy page (change password, export / delete my data)
+- [x] Web Push notifications (VAPID) + service metrics endpoint
+- [x] Bilingual UI (ES/EN) with auto-detection across HUD, login, security & account
+- [x] `.env.example` config reference + CI lint (ruff) and dependency audit (pip-audit, Dependabot)
 
 ---
 
-*Built with the Claude API. UI text is in Spanish; the assistant converses in Spanish.*
+*Built with the Claude API. The UI is bilingual (Spanish / English) and the assistant
+converses in both. Configure everything via [`.env.example`](.env.example).*
