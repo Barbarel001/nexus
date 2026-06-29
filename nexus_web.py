@@ -918,6 +918,28 @@ def trades_lista_api():
     return jsonify({"ops": ops[:max(1, min(n, 200))]})
 
 
+@app.route("/api/trades/export.csv")
+def trades_export_csv():
+    """Descarga todas las operaciones en CSV (para Excel/impuestos/análisis)."""
+    csv_txt = analitica.exportar_csv()
+    return Response(csv_txt, mimetype="text/csv", headers={
+        "Content-Disposition": "attachment; filename=nexus-operaciones.csv"})
+
+
+@app.route("/api/trades/import", methods=["POST"])
+def trades_import_csv():
+    """Importa operaciones desde un CSV (campo 'csv' en JSON o archivo subido)."""
+    texto = ""
+    if request.files.get("file"):
+        texto = request.files["file"].read().decode("utf-8", "replace")
+    else:
+        texto = (request.get_json(silent=True) or {}).get("csv", "")
+    if not texto.strip():
+        return jsonify({"ok": False, "error": "CSV vacío"}), 400
+    r = analitica.importar_csv(texto)
+    return jsonify({"ok": True, **r})
+
+
 @app.route("/api/trade/eliminar", methods=["POST"])
 def trade_eliminar_api():
     """Elimina una operación por su id."""
