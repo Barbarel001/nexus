@@ -6,7 +6,6 @@ import urllib.request
 
 import nexus_ollama
 
-
 # --------------------------- Conversión de herramientas ---------------------------
 
 def test_tools_ollama_filtra_peligrosas_y_websearch():
@@ -56,7 +55,6 @@ def test_chat_eventos_flujo_con_herramienta(monkeypatch):
 
     eventos = list(nexus_ollama.chat_eventos(
         [{"role": "user", "content": "hola"}], "sistema", [], ejecutar))
-    tipos = [e[0] for e in eventos]
 
     assert llamadas == ["nt_estado"]              # ejecutó la herramienta pedida
     assert ("tool", "nt_estado") in eventos
