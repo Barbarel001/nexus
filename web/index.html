@@ -249,8 +249,8 @@
   <div class="shell">
     <div class="overlay" id="overlay"></div>
     <aside class="sidebar" id="sidebar">
-      <button class="sb-new" id="new">＋ Nueva conversación</button>
-      <input class="search" id="search" placeholder="🔍 Buscar…" autocomplete="off" />
+      <button class="sb-new" id="new" data-i18n="newConv">＋ Nueva conversación</button>
+      <input class="search" id="search" data-i18n-ph="search.ph" placeholder="🔍 Buscar…" autocomplete="off" />
       <span class="sb-title">Historial</span>
       <div class="conv-list" id="convList"></div>
       <div class="sb-foot" id="sbFoot"></div>
@@ -259,18 +259,18 @@
     <div class="main">
       <header class="row">
         <button class="btn-ic hamb" id="hamb" title="Menú">☰</button>
-        <div class="brand"><div class="logo">NEXUS</div><div class="sub">Asistente IA</div></div>
+        <div class="brand"><div class="logo">NEXUS</div><div class="sub" data-i18n="app.sub">Asistente IA</div></div>
         <div class="controls">
           <span class="badge"><span class="led"></span> En línea</span>
-          <button class="btn-ic" id="dashBtn" title="Panel (trading y tareas)">📊</button>
-          <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
-          <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
-          <a class="btn-ic" id="secBtn" href="/seguridad" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
-          <a class="btn-ic" id="cuentaBtn" href="/cuenta" title="Mi cuenta" style="display:none;align-items:center">👤</a>
-          <button class="btn-ic" id="resumirBtn" title="Resumir esta conversación">📝</button>
-          <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
-          <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
-          <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
+          <button class="btn-ic" id="dashBtn" data-i18n-title="t.dash" title="Panel (trading y tareas)">📊</button>
+          <button class="btn-ic" id="memBtn" data-i18n-title="t.mem" title="Memoria de Nexus">🧠</button>
+          <a class="btn-ic" id="adminBtn" href="/admin" data-i18n-title="t.admin" title="Administración" style="display:none;align-items:center">🛠️</a>
+          <a class="btn-ic" id="secBtn" href="/seguridad" data-i18n-title="t.sec" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
+          <a class="btn-ic" id="cuentaBtn" href="/cuenta" data-i18n-title="t.cuenta" title="Mi cuenta" style="display:none;align-items:center">👤</a>
+          <button class="btn-ic" id="resumirBtn" data-i18n-title="t.resumir" title="Resumir esta conversación">📝</button>
+          <button class="btn-ic" id="export" data-i18n-title="t.export" title="Exportar conversación a Markdown">⬇</button>
+          <button class="btn-ic" id="settings" data-i18n-title="t.settings" title="Ajustes">⚙</button>
+          <button class="btn-ic" id="tts" data-i18n-title="t.tts" title="Leer respuestas en voz alta">🔇</button>
         </div>
       </header>
 
@@ -280,15 +280,15 @@
         <button id="mic" type="button" title="Hablar a Nexus" aria-label="Hablar">🎤</button>
         <button id="imgBtn" type="button" title="Analizar una imagen" aria-label="Imagen">📎</button>
         <input id="imgFile" type="file" accept="image/*" style="display:none" />
-        <input id="inp" placeholder="Escribe un mensaje o pulsa el micrófono…" autofocus />
-        <button id="send" type="submit">Enviar</button>
+        <input id="inp" data-i18n-ph="msg.ph" placeholder="Escribe un mensaje o pulsa el micrófono…" autofocus />
+        <button id="send" type="submit" data-i18n="send">Enviar</button>
       </form>
     </div>
 
     <!-- Panel-dashboard: trading (NinjaTrader) + tareas -->
     <aside class="dash" id="dash">
       <div class="dash-head">
-        <span class="logo-sm">PANEL</span>
+        <span class="logo-sm" data-i18n="panel">PANEL</span>
         <span style="margin-left:auto;display:flex;gap:5px">
           <button class="btn-ic" id="newsBtn" title="Noticias de mercado" style="min-width:32px;height:30px">📰</button>
           <button class="btn-ic" id="climaBtn" title="Clima" style="min-width:32px;height:30px">🌤️</button>
@@ -299,7 +299,7 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">📈 NinjaTrader <button class="mini" id="diarioBtn" title="Diario de trading">📒</button></div>
+        <div class="sect-h">📈 <span data-i18n="sect.nt">NinjaTrader</span> <button class="mini" id="diarioBtn" title="Diario de trading">📒</button></div>
         <div class="card">
           <div class="nt-stat" id="ntStatus"><span class="led off"></span> …</div>
           <div class="nt-acct" id="ntAcct"></div>
@@ -313,7 +313,7 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">📊 Analítica
+        <div class="sect-h">📊 <span data-i18n="sect.analitica">Analítica</span>
           <select id="anFiltro" title="Filtrar por instrumento"
                   style="margin-left:auto;background:var(--panel-2);border:1px solid var(--line-2);color:var(--txt);border-radius:8px;font-size:11px;padding:2px 4px">
             <option value="">Todos</option>
@@ -321,7 +321,7 @@
           <button class="mini" id="anRefresh" title="Actualizar">↻</button>
         </div>
         <div class="card">
-          <div class="nt-sum" id="anStats">Sin operaciones aún.</div>
+          <div class="nt-sum" id="anStats" data-i18n="empty.trades">Sin operaciones aún.</div>
           <canvas id="anEquity" height="44" style="width:100%;margin-top:8px;display:none"></canvas>
         </div>
         <div class="add-row">
@@ -359,7 +359,7 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">🔔 Alertas <span class="n" id="alertasN">0</span></div>
+        <div class="sect-h">🔔 <span data-i18n="sect.alertas">Alertas</span> <span class="n" id="alertasN">0</span></div>
         <div id="alertasList"></div>
         <div class="add-row alert-add">
           <input id="alInst" placeholder="Instrumento" autocomplete="off" />
@@ -376,7 +376,7 @@
       </div>
 
       <div class="sect">
-        <div class="sect-h">✅ Tareas <span class="n" id="tareasN">0</span></div>
+        <div class="sect-h">✅ <span data-i18n="sect.tareas">Tareas</span> <span class="n" id="tareasN">0</span></div>
         <div class="tabs" id="tareaTabs">
           <button class="tab active" data-f="pendientes">Pendientes</button>
           <button class="tab" data-f="hoy">Hoy</button>
@@ -469,6 +469,8 @@
     <div class="modal">
       <div class="modal-h">⚙ Ajustes</div>
       <div class="modal-sub">Se guardan en este navegador.</div>
+      <label class="fld"><span data-i18n="lang">Idioma</span><select id="setLang">
+        <option value="es">Español</option><option value="en">English</option></select></label>
       <label class="fld"><span>Modelo</span><select id="setModel"></select></label>
       <label class="fld"><span>¿Cómo quieres que Nexus te llame?</span><input type="text" id="setNombre" placeholder="Señor" /></label>
       <label class="fld"><span>Tema</span><select id="setTheme">
@@ -523,6 +525,39 @@ function toast(msg, tipo){
   requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
   setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 250); }, 3200);
 }
+// --- i18n: traducción de la interfaz (ES/EN), persistente y con autodetección ---
+const I18N = {
+  es: {
+    'app.sub':'Asistente IA', 'newConv':'＋ Nueva conversación', 'search.ph':'🔍 Buscar…',
+    'msg.ph':'Escribe un mensaje o pulsa el micrófono…', 'send':'Enviar', 'stop':'Detener',
+    'panel':'PANEL', 'sect.nt':'NinjaTrader', 'sect.analitica':'Analítica',
+    'sect.alertas':'Alertas', 'sect.tareas':'Tareas', 'lang':'Idioma',
+    't.dash':'Panel (trading y tareas)', 't.mem':'Memoria de Nexus', 't.resumir':'Resumir esta conversación',
+    't.export':'Exportar conversación a Markdown', 't.settings':'Ajustes', 't.tts':'Leer respuestas en voz alta',
+    't.admin':'Administración', 't.sec':'Seguridad (2FA)', 't.cuenta':'Mi cuenta',
+    'empty.tareas':'Nada por aquí 🎉', 'empty.alertas':'Sin alertas', 'empty.trades':'Sin operaciones aún.',
+  },
+  en: {
+    'app.sub':'AI assistant', 'newConv':'＋ New chat', 'search.ph':'🔍 Search…',
+    'msg.ph':'Type a message or tap the mic…', 'send':'Send', 'stop':'Stop',
+    'panel':'PANEL', 'sect.nt':'NinjaTrader', 'sect.analitica':'Analytics',
+    'sect.alertas':'Alerts', 'sect.tareas':'Tasks', 'lang':'Language',
+    't.dash':'Dashboard (trading & tasks)', 't.mem':'Nexus memory', 't.resumir':'Summarize this conversation',
+    't.export':'Export conversation to Markdown', 't.settings':'Settings', 't.tts':'Read replies aloud',
+    't.admin':'Administration', 't.sec':'Security (2FA)', 't.cuenta':'My account',
+    'empty.tareas':'All clear 🎉', 'empty.alertas':'No alerts', 'empty.trades':'No trades yet.',
+  },
+};
+let LANG = localStorage.getItem('nexus_lang') || (navigator.language || 'es').slice(0,2).toLowerCase();
+if(LANG !== 'en') LANG = 'es';
+function t(key){ return (I18N[LANG] && I18N[LANG][key]) || I18N.es[key] || key; }
+function aplicarI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.getAttribute('data-i18n-title')); el.setAttribute('aria-label', el.title); });
+  document.documentElement.lang = LANG;
+}
+function setLang(l){ LANG = (l === 'en') ? 'en' : 'es'; localStorage.setItem('nexus_lang', LANG); aplicarI18n(); }
 const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const inp  = document.getElementById('inp');
@@ -702,7 +737,7 @@ function addNexus(){
   chat.appendChild(m); scrollEnd(); return m;
 }
 function setBusy(v){
-  busy = v; send.textContent = v ? 'Detener' : 'Enviar'; send.classList.toggle('stop', v);
+  busy = v; send.textContent = v ? t('stop') : t('send'); send.classList.toggle('stop', v);
 }
 
 function sendMessage(text, porVoz, opts){
@@ -899,8 +934,10 @@ document.getElementById('settings').addEventListener('click', () => {
   document.getElementById('setTheme').value = SET.theme;
   document.getElementById('setAccent').value = SET.accent;
   document.getElementById('setCiudad').value = SET.ciudad;
+  document.getElementById('setLang').value = LANG;
   setBg.classList.add('show');
 });
+document.getElementById('setLang').addEventListener('change', e => setLang(e.target.value));
 document.getElementById('setCancel').addEventListener('click', () => setBg.classList.remove('show'));
 // Vista previa en vivo del tema/acento mientras se eligen.
 document.getElementById('setTheme').addEventListener('change', e => { SET.theme = e.target.value; aplicarApariencia(); });
@@ -1004,7 +1041,7 @@ async function refreshAnalitica(){
     const d = await r.json(); const s = d.stats || {};
     poblarFiltro(d.instrumentos);
     const el = document.getElementById('anStats');
-    if(!s.n){ el.textContent = 'Sin operaciones aún.'; document.getElementById('anEquity').style.display='none'; return; }
+    if(!s.n){ el.textContent = t('empty.trades'); document.getElementById('anEquity').style.display='none'; return; }
     const pf = s.profit_factor_infinito ? '∞' : (s.profit_factor ?? '—');
     const col = s.pnl_total>=0 ? 'var(--ok,#34d399)' : 'var(--bad,#f87171)';
     const rTxt = (s.avg_r!=null) ? ' · R '+s.avg_r : '';
@@ -1100,7 +1137,7 @@ function renderTareas(){
   document.getElementById('tareasN').textContent = tareasPend.length;
   const list = tareaFiltro === 'pendientes' ? tareasPend : tareasPend.filter(t => t.sev === tareaFiltro);
   cont.innerHTML = '';
-  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Nada por aquí 🎉</div>'; return; }
+  if(!list.length){ cont.innerHTML = '<div class="dash-empty">' + t('empty.tareas') + '</div>'; return; }
   for(const t of list){
     const row = document.createElement('div'); row.className = 'trow';
     const due = t.etiqueta ? '<div class="due ' + esc(t.sev) + '">' + esc(t.etiqueta) + '</div>' : '';
@@ -1373,7 +1410,7 @@ function renderAlertas(list){
   const cont = document.getElementById('alertasList');
   document.getElementById('alertasN').textContent = list.length;
   cont.innerHTML = '';
-  if(!list.length){ cont.innerHTML = '<div class="dash-empty">Sin alertas</div>'; return; }
+  if(!list.length){ cont.innerHTML = '<div class="dash-empty">' + t('empty.alertas') + '</div>'; return; }
   for(const a of list){
     const row = document.createElement('div'); row.className = 'arow' + (a.disparada ? ' hit' : '');
     row.innerHTML = '<span class="asym">' + esc(a.instrument) + '</span>' +
@@ -1470,6 +1507,7 @@ if('serviceWorker' in navigator){
 /* ---------- Inicio ---------- */
 (async function init(){
   aplicarApariencia();
+  aplicarI18n();
   aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   if(cfg.admin){ const ab = document.getElementById('adminBtn'); if(ab) ab.style.display = 'flex'; }
