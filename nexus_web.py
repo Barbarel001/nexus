@@ -20,43 +20,45 @@ con la variable de entorno NEXUS_WEB_ACCIONES=1: en ese caso CADA accion peligro
 requiere tu aprobacion explicita en un modal de confirmacion del navegador.
 """
 
-import os
-import sys
+import datetime
 import json
+import os
+import secrets
+import sys
+import threading
 import time
 import uuid
-import secrets
-import datetime
-import threading
 
 try:
     import anthropic  # noqa: F401
 except ImportError:
     sys.exit("Falta 'anthropic'. Ejecuta: pip install anthropic")
 import hmac
+
 try:
-    from flask import (Flask, request, Response, send_from_directory, jsonify,
-                       session, redirect, render_template_string)
+    from flask import Flask, Response, jsonify, redirect, render_template_string, request, send_from_directory, session
 except ImportError:
     sys.exit("Falta 'flask'. Ejecuta: pip install flask")
 
 import anthropic
-import nexus_util  # escritura atomica / logging
-import nexus_ctx  # contexto de usuario (aislamiento de datos)
-import nexus_totp  # 2FA (TOTP) en Python puro
+
 import nexus  # reutilizamos toda la logica del Nexus de terminal
-import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
-import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
-import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_alertas as alertas  # alertas de precio
-import nexus_docs as docs  # RAG-lite sobre documentos
-import nexus_noticias as noticias  # titulares de mercado
-import nexus_gastos as gastos  # control de gastos
-import nexus_clima as clima  # clima
-import nexus_google as google  # Google Calendar + Gmail
-import nexus_backtest as backtest  # backtesting
 import nexus_analitica as analitica  # analitica de trading (stats / equity / riesgo)
+import nexus_backtest as backtest  # backtesting
+import nexus_clima as clima  # clima
+import nexus_ctx  # contexto de usuario (aislamiento de datos)
+import nexus_db  # cuentas / SQLite (modo multiusuario)
+import nexus_docs as docs  # RAG-lite sobre documentos
+import nexus_gastos as gastos  # control de gastos
+import nexus_google as google  # Google Calendar + Gmail
+import nexus_ninjatrader as nt  # puente con NinjaTrader (trading)
+import nexus_noticias as noticias  # titulares de mercado
+import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
+import nexus_tareas as tareas  # productividad (tareas/recordatorios)
+import nexus_totp  # 2FA (TOTP) en Python puro
+import nexus_util  # escritura atomica / logging
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.json"))
@@ -102,7 +104,6 @@ NEXUS_PASSWORD = nexus._env("NEXUS_PASSWORD", "")
 # Modo MULTIUSUARIO (SaaS): NEXUS_MULTIUSER=1 activa cuentas (registro/login con
 # email+contraseña) sobre SQLite. Si esta off, se usa el modo de una sola
 # contraseña (NEXUS_PASSWORD) o ninguno (uso local). Opt-in para no romper nada.
-import nexus_db
 NEXUS_MULTIUSER = nexus._env("NEXUS_MULTIUSER", "0").lower() in ("1", "true", "yes", "on")
 if NEXUS_MULTIUSER:
     nexus_db.init()
@@ -191,6 +192,21 @@ def _publicar_csrf(resp):
                             max_age=60 * 60 * 24 * 30)
     except RuntimeError:
         pass  # sin contexto de sesion/peticion
+    return resp
+
+
+# ---------------- Metricas de servicio (observabilidad ligera) -------------
+# Contadores en memoria para vigilar la salud del servicio sin dependencias.
+_METRICAS = {"inicio": time.time(), "peticiones": 0, "errores": 0}
+_lock_metricas = threading.Lock()
+
+
+@app.after_request
+def _contar_metricas(resp):
+    with _lock_metricas:
+        _METRICAS["peticiones"] += 1
+        if resp.status_code >= 500:
+            _METRICAS["errores"] += 1
     return resp
 
 
@@ -713,6 +729,25 @@ def health():
     return jsonify({"ok": True, "service": "nexus", "multiuser": NEXUS_MULTIUSER})
 
 
+@app.route("/api/metrics")
+def metrics():
+    """Metricas de servicio (uptime, peticiones, errores). Gated por admin si hay login."""
+    if _auth_requerida() and not _es_admin():
+        return jsonify({"error": "no autorizado"}), 403
+    with _lock_metricas:
+        m = dict(_METRICAS)
+    datos = {
+        "uptime_segundos": int(time.time() - m["inicio"]),
+        "peticiones": m["peticiones"],
+        "errores": m["errores"],
+        "backend": nexus.BACKEND,
+        "multiuser": NEXUS_MULTIUSER,
+    }
+    if NEXUS_MULTIUSER:
+        datos["usuarios"] = nexus_db.contar_usuarios()
+    return jsonify(datos)
+
+
 @app.route("/api/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     """Webhook de Stripe: al completar el pago, activa el plan del usuario."""
@@ -1222,7 +1257,8 @@ def main():
 def _arrancar_proactivo():
     """Arranca, en hilos daemon, el bot de Telegram y el scheduler si estan configurados."""
     try:
-        import nexus_telegram, nexus_scheduler
+        import nexus_scheduler
+        import nexus_telegram
         if nexus_telegram.configurado():
             threading.Thread(target=nexus_telegram.run, daemon=True, name="nexus-telegram").start()
             nexus_scheduler.iniciar_en_hilo()

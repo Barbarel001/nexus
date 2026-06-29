@@ -2,10 +2,11 @@
 """Tests de la analitica de trading: estadisticas, equity, drawdown y riesgo."""
 
 import math
+
 import pytest
 
-import nexus_ctx
 import nexus_analitica as A
+import nexus_ctx
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +73,9 @@ def test_racha_actual():
 
 
 def test_por_instrumento():
-    A.registrar("ES", 100); A.registrar("NQ", -40); A.registrar("ES", 25)
+    A.registrar("ES", 100)
+    A.registrar("NQ", -40)
+    A.registrar("ES", 25)
     assert A.estadisticas()["por_instrumento"] == {"ES": 125.0, "NQ": -40.0}
 
 

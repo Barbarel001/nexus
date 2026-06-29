@@ -9,7 +9,6 @@ import nexus_clima as clima
 import nexus_discord as discord
 import nexus_util
 
-
 # --------------------------- Clima ---------------------------
 
 class _Resp:
@@ -76,8 +75,10 @@ def test_discord_envia(monkeypatch):
 
 def test_respaldar_copia_y_limpia(tmp_path):
     # crea 3 archivos de datos
-    a = tmp_path / "memoria.json"; a.write_text("{}", encoding="utf-8")
-    b = tmp_path / "tareas.json"; b.write_text("{}", encoding="utf-8")
+    a = tmp_path / "memoria.json"
+    a.write_text("{}", encoding="utf-8")
+    b = tmp_path / "tareas.json"
+    b.write_text("{}", encoding="utf-8")
     dest = tmp_path / "backups"
     n = nexus_util.respaldar([str(a), str(b), str(tmp_path / "no_existe.json")], str(dest))
     assert n == 2
@@ -88,7 +89,8 @@ def test_respaldar_copia_y_limpia(tmp_path):
 
 
 def test_respaldar_conserva_solo_keep(tmp_path):
-    a = tmp_path / "d.json"; a.write_text("{}", encoding="utf-8")
+    a = tmp_path / "d.json"
+    a.write_text("{}", encoding="utf-8")
     dest = tmp_path / "bk"
     # simula respaldos viejos
     for fecha in ["2026-01-01", "2026-01-02", "2026-01-03"]:

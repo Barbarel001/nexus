@@ -4,15 +4,11 @@ funciones puras y el despacho seguro de herramientas."""
 
 import datetime
 
-import pytest
-
-import nexus
-import nexus_telegram as tg
-import nexus_scheduler as sched
-import nexus_tareas as tareas
 import nexus_alertas as alertas
 import nexus_ninjatrader as nt
-
+import nexus_scheduler as sched
+import nexus_tareas as tareas
+import nexus_telegram as tg
 
 # --------------------------- Telegram: utilidades ---------------------------
 

@@ -7,7 +7,6 @@ import nexus
 import nexus_backtest as bt
 import nexus_pagos as pagos
 
-
 # --------------------------- Backtest ---------------------------
 
 def test_sma():
@@ -86,7 +85,8 @@ def test_api_webhook_firma_invalida(monkeypatch):
 
 def test_webhook_activa_plan(monkeypatch, tmp_path):
     """Simula un evento de Stripe y comprueba que sube el plan del usuario."""
-    import nexus_web, nexus_db
+    import nexus_db
+    import nexus_web
     monkeypatch.setattr(nexus_db, "DB_PATH", str(tmp_path / "wh.db"))
     nexus_db.init()
     u = nexus_db.crear_usuario("pagador@mail.com", "secreta1")

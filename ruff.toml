@@ -1,0 +1,15 @@
+# Configuración de Ruff (linter de Python) para NEXUS.
+# Reglas pragmáticas: errores reales (pyflakes F), estilo básico (E/W) e imports (I).
+# No imponemos longitud de línea (E501) para no generar ruido en el código existente.
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # longitud de línea (el proyecto usa líneas largas a propósito)
+    "E741",  # nombres de variable ambiguos (l, I) — no aplica como error aquí
+]
+
+[lint.per-file-ignores]
+# En los tests permitimos imports "no usados" (fixtures) y comparaciones explícitas.
+"tests/*" = ["F811", "E712"]

@@ -16,13 +16,13 @@ Configuracion:
     NEXUS_MONEDA     Simbolo de moneda para mostrar (defecto '$').
 """
 
-import os
-import math
-import uuid
 import datetime
+import math
+import os
+import uuid
 
-import nexus_util
 import nexus_ctx
+import nexus_util
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 OPS_PATH = os.environ.get("NEXUS_OPS_PATH") or os.path.join(_CARPETA, "operaciones.json")

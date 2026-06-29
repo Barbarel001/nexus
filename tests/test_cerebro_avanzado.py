@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """Tests del cerebro avanzado: embeddings (coseno/rank), búsqueda semántica y resumen."""
 
-import pytest
 
-import nexus_embeddings as E
-import nexus_docs as docs
-import nexus_ctx
 import nexus
-
+import nexus_ctx
+import nexus_docs as docs
+import nexus_embeddings as E
 
 # --------------------------- Coseno ---------------------------
 

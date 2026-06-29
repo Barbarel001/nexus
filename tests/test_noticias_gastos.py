@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 """Tests de noticias de mercado (RSS simulado) y control de gastos."""
 
-import datetime
 
 import pytest
 
 import nexus
-import nexus_noticias as noticias
 import nexus_gastos as gastos
-
+import nexus_noticias as noticias
 
 # --------------------------- Noticias (RSS) ---------------------------
 
@@ -118,8 +116,8 @@ def test_api_noticias_endpoint(monkeypatch):
 
 
 def test_api_clima_endpoint(monkeypatch):
-    import nexus_web
     import nexus_clima as clima
+    import nexus_web
     monkeypatch.setattr(clima, "obtener", lambda *a, **k: {
         "ciudad": "Madrid", "temp": 20, "desc": "despejado", "max": 25, "min": 12})
     c = nexus_web.app.test_client()

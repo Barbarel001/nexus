@@ -14,9 +14,9 @@ Configuracion:
     NEXUS_DOCS_DIR   Carpeta de documentos (defecto: ./documentos junto a este script).
 """
 
+import glob
 import os
 import re
-import glob
 
 import nexus_ctx
 

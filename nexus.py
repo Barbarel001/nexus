@@ -17,11 +17,11 @@ Requisitos:
   y una API key de Anthropic en la variable de entorno ANTHROPIC_API_KEY.
 """
 
+import datetime
+import json
 import os
 import sys
-import json
 import uuid
-import datetime
 
 # Hacer que la salida soporte acentos/emoji en la terminal de Windows.
 try:
@@ -34,19 +34,18 @@ try:
 except ImportError:
     sys.exit("Falta la libreria 'anthropic'. Ejecuta:  pip install anthropic")
 
-import nexus_util  # utilidades base (escritura atomica, logging)
-import nexus_ctx  # contexto de usuario (aislamiento de datos multiusuario)
-import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
-import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_alertas as alertas  # alertas de precio sobre NinjaTrader
-import nexus_docs as docs  # RAG-lite sobre documentos del usuario
-import nexus_noticias as noticias  # titulares de mercado (RSS)
-import nexus_gastos as gastos  # control de gastos personales
-import nexus_clima as clima  # clima (Open-Meteo, gratis)
-import nexus_google as google  # Google Calendar + Gmail (opcional)
-import nexus_backtest as backtest  # backtesting de estrategias
 import nexus_analitica as analitica  # analitica de trading (stats, equity, riesgo)
-
+import nexus_backtest as backtest  # backtesting de estrategias
+import nexus_clima as clima  # clima (Open-Meteo, gratis)
+import nexus_ctx  # contexto de usuario (aislamiento de datos multiusuario)
+import nexus_docs as docs  # RAG-lite sobre documentos del usuario
+import nexus_gastos as gastos  # control de gastos personales
+import nexus_google as google  # Google Calendar + Gmail (opcional)
+import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
+import nexus_noticias as noticias  # titulares de mercado (RSS)
+import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
+import nexus_util  # utilidades base (escritura atomica, logging)
 
 # ============================================================
 #  CONFIGURACION  (cambia estas variables a tu gusto)
@@ -425,8 +424,8 @@ def tool_olvidar_memoria(args: dict) -> str:
 def tool_rastrear_ofertas(args: dict) -> str:
     """Descarga ofertas reales de varias fuentes (Remotive, RemoteOK, Arbeitnow) y
     las filtra por palabras clave, DEDUPLICANDO por URL para no repetir."""
-    import urllib.request
     import urllib.parse
+    import urllib.request
     consulta = (args.get("palabras_clave") or "python").strip()
     palabras = [p.lower() for p in consulta.split() if p]
     headers = {"User-Agent": "Mozilla/5.0 (NEXUS-job-tracker)"}
@@ -749,8 +748,9 @@ def _completar_simple(prompt: str, model: str = None) -> str:
     """Una sola respuesta de texto del modelo (sin herramientas). Para resumenes.
     Usa Ollama si el backend es local; si no, la API de Claude."""
     if BACKEND == "ollama":
-        import nexus_ollama
         import urllib.request
+
+        import nexus_ollama
         payload = {"model": nexus_ollama.OLLAMA_MODEL, "prompt": prompt, "stream": False}
         req = urllib.request.Request(
             nexus_ollama.OLLAMA_HOST + "/api/generate",

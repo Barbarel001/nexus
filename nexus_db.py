@@ -14,12 +14,12 @@ Configuracion:
     NEXUS_DB_PATH   Ruta del archivo SQLite (defecto: nexus.db junto a este script).
 """
 
-import os
-import json
-import sqlite3
-import hashlib
-import secrets
 import datetime
+import hashlib
+import json
+import os
+import secrets
+import sqlite3
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("NEXUS_DB_PATH") or os.path.join(_CARPETA, "nexus.db")

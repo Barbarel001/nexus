@@ -10,8 +10,8 @@ Configuracion:
     NEXUS_CIUDAD   Ciudad por defecto (para el resumen matutino y cuando no se indica).
 """
 
-import os
 import json
+import os
 import urllib.parse
 import urllib.request
 

@@ -2,12 +2,12 @@
 """Tests de la cuenta de usuario: contraseña, exportar y borrar (datos + BD)."""
 
 import os
+
 import pytest
 
-import nexus_db
 import nexus_ctx
+import nexus_db
 import nexus_web
-
 
 # --------------------------- BD ---------------------------
 

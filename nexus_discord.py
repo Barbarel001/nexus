@@ -13,8 +13,8 @@ Configuracion:
     NEXUS_DISCORD_WEBHOOK   URL del webhook del canal.
 """
 
-import os
 import json
+import os
 import urllib.request
 
 WEBHOOK = os.environ.get("NEXUS_DISCORD_WEBHOOK") or ""

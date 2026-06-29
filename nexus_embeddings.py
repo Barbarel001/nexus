@@ -16,9 +16,9 @@ Configuración:
     OLLAMA_HOST         Host de Ollama (lo comparte con nexus_ollama).
 """
 
-import os
 import json
 import math
+import os
 import urllib.request
 
 import nexus_ollama
