@@ -16,6 +16,7 @@ Así, en SaaS multiusuario, los datos de un usuario nunca se mezclan con los de 
 """
 
 import os
+import shutil
 import threading
 
 _CARPETA = os.path.dirname(os.path.abspath(__file__))
@@ -55,3 +56,17 @@ def user_dir(dir_global: str) -> str:
     if current_user() is None:
         return dir_global
     return os.path.join(_carpeta_usuario(), os.path.basename(dir_global.rstrip("/\\")))
+
+
+def carpeta_de(uid) -> str:
+    """Ruta de la carpeta de datos de un usuario concreto (sin tocar el contexto)."""
+    return os.path.join(USERS_DIR, str(uid))
+
+
+def borrar_datos(uid) -> bool:
+    """Elimina TODA la carpeta de datos de un usuario. Para 'borrar mi cuenta'."""
+    carpeta = carpeta_de(uid)
+    if os.path.isdir(carpeta):
+        shutil.rmtree(carpeta, ignore_errors=True)
+        return True
+    return False

@@ -591,6 +591,78 @@ def seguridad_page():
     return send_from_directory(WEBDIR, "seguridad.html")
 
 
+# ---------------- Cuenta de usuario (perfil, contraseña, datos) ----------------
+@app.route("/cuenta")
+def cuenta_page():
+    if not _uid_actual():
+        return redirect("/login") if _auth_requerida() else ("La cuenta solo existe en modo multiusuario.", 400)
+    return send_from_directory(WEBDIR, "cuenta.html")
+
+
+@app.route("/api/cuenta")
+def api_cuenta():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"error": "no disponible"}), 400
+    u = nexus_db.obtener_usuario(uid) or {}
+    _, totp_on = nexus_db.get_totp(uid)
+    return jsonify({"email": u.get("email"), "plan": u.get("plan"),
+                    "creado": u.get("creado"), "twofa": totp_on})
+
+
+@app.route("/api/cuenta/password", methods=["POST"])
+def api_cuenta_password():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    try:
+        nexus_db.cambiar_password(uid, body.get("actual", ""), body.get("nueva", ""))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    return jsonify({"ok": True})
+
+
+def _exportar_datos(uid: int) -> dict:
+    """Reúne todos los datos del usuario (el contexto ya está fijado en before_request)."""
+    return {
+        "exportado": datetime.datetime.now().isoformat(timespec="seconds"),
+        "perfil": nexus_db.obtener_usuario(uid),
+        "memoria": nexus.cargar_notas(),
+        "tareas": tareas.cargar(),
+        "alertas": alertas.cargar(),
+        "gastos": gastos.cargar(),
+        "operaciones": analitica.cargar(),
+        "conversaciones": cargar_convs().get("convs", []),
+    }
+
+
+@app.route("/api/cuenta/exportar")
+def api_cuenta_exportar():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"error": "no disponible"}), 400
+    datos = json.dumps(_exportar_datos(uid), ensure_ascii=False, indent=2)
+    return Response(datos, mimetype="application/json", headers={
+        "Content-Disposition": "attachment; filename=nexus-mis-datos.json"})
+
+
+@app.route("/api/cuenta/borrar", methods=["POST"])
+def api_cuenta_borrar():
+    uid = _uid_actual()
+    if not uid:
+        return jsonify({"ok": False, "error": "no disponible"}), 400
+    body = request.get_json(silent=True) or {}
+    # Exige reautenticación con la contraseña antes de un borrado irreversible.
+    u = nexus_db.obtener_usuario(uid)
+    if not (u and nexus_db.autenticar(u["email"], body.get("password", ""))):
+        return jsonify({"ok": False, "error": "contraseña incorrecta"}), 400
+    nexus_ctx.borrar_datos(uid)      # archivos en disco
+    nexus_db.borrar_usuario(uid)     # fila en la BD
+    session.clear()
+    return jsonify({"ok": True})
+
+
 def _es_admin() -> bool:
     """True si el usuario actual es administrador (multiusuario + email en la lista)."""
     return bool(NEXUS_MULTIUSER and NEXUS_ADMIN_EMAIL

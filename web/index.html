@@ -266,6 +266,7 @@
           <button class="btn-ic" id="memBtn" title="Memoria de Nexus">🧠</button>
           <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
           <a class="btn-ic" id="secBtn" href="/seguridad" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
+          <a class="btn-ic" id="cuentaBtn" href="/cuenta" title="Mi cuenta" style="display:none;align-items:center">👤</a>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -1327,7 +1328,8 @@ if('serviceWorker' in navigator){
   aplicarAria();
   try{ const rc = await fetch('/api/config'); if(rc.ok) cfg = await rc.json(); }catch(_){ }
   if(cfg.admin){ const ab = document.getElementById('adminBtn'); if(ab) ab.style.display = 'flex'; }
-  if(cfg.multiuser){ const sb = document.getElementById('secBtn'); if(sb) sb.style.display = 'flex'; }
+  if(cfg.multiuser){ const sb = document.getElementById('secBtn'); if(sb) sb.style.display = 'flex';
+                     const cb = document.getElementById('cuentaBtn'); if(cb) cb.style.display = 'flex'; }
   aplicarTts(SET.tts);
   if(window.innerWidth <= 1100){ dash.classList.add('collapsed'); }  // en móvil arranca cerrado
   arrancarPanel();

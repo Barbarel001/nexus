@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Mi cuenta</title>
+<style>
+ *{box-sizing:border-box} html,body{margin:0;min-height:100%}
+ body{font-family:system-ui,'Segoe UI',Roboto,sans-serif;
+   background:radial-gradient(900px 500px at 60% -160px,rgba(56,189,248,.10),transparent 70%),#0a0f1a;
+   color:#e6edf5;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px}
+ .box{width:100%;max-width:480px;padding:28px;background:#121a28;border:1px solid rgba(148,163,184,.20);
+   border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+ h1{font-size:20px;margin:0 0 4px;letter-spacing:1px}
+ .sub{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#5f6e82;margin-bottom:20px}
+ h2{font-size:14px;margin:22px 0 10px;color:#c3cede;border-top:1px solid rgba(148,163,184,.14);padding-top:18px}
+ .perfil{font-size:14px;line-height:1.8;color:#c3cede}
+ .perfil b{color:#e6edf5}
+ .chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(56,189,248,.14);color:#7dd3fc}
+ input{width:100%;height:44px;background:#0d1420;border:1px solid rgba(148,163,184,.30);color:#e6edf5;
+   font-size:15px;padding:0 14px;border-radius:11px;outline:none;margin:7px 0}
+ input:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+ button{width:100%;height:44px;border:none;border-radius:11px;cursor:pointer;font-weight:600;font-size:15px;margin-top:8px}
+ .primary{background:#38bdf8;color:#04121d}
+ .danger{background:transparent;color:#fca5a5;border:1px solid rgba(248,113,113,.4)}
+ .ghost{background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3)}
+ button:hover{filter:brightness(1.08)}
+ .msg{min-height:18px;font-size:13px;text-align:center;margin-top:8px}
+ .err{color:#f87171}.ok{color:#86efac}
+ a.volver{display:inline-block;margin-top:20px;color:#5f6e82;font-size:13px;text-decoration:none}
+ .peligro{border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px;margin-top:8px}
+ .peligro p{font-size:13px;color:#fca5a5;margin:0 0 10px}
+</style>
+</head>
+<body>
+ <div class="box">
+   <h1>Mi cuenta</h1>
+   <div class="sub">Perfil y datos</div>
+
+   <div class="perfil" id="perfil">Cargando…</div>
+
+   <h2>🔑 Cambiar contraseña</h2>
+   <input id="pwActual" type="password" placeholder="Contraseña actual" autocomplete="current-password">
+   <input id="pwNueva" type="password" placeholder="Nueva contraseña (mín. 6)" autocomplete="new-password">
+   <button id="btnPw" class="primary">Actualizar contraseña</button>
+   <div id="msgPw" class="msg"></div>
+
+   <h2>📦 Mis datos</h2>
+   <button id="btnExport" class="ghost">Exportar todos mis datos (JSON)</button>
+
+   <h2>🗑️ Eliminar cuenta</h2>
+   <div class="peligro">
+     <p>Esto borra <b>para siempre</b> tu cuenta y todos tus datos (memoria, tareas,
+        alertas, gastos, operaciones y conversaciones). No se puede deshacer.</p>
+     <input id="pwBorrar" type="password" placeholder="Confirma con tu contraseña" autocomplete="current-password">
+     <button id="btnBorrar" class="danger">Eliminar mi cuenta definitivamente</button>
+     <div id="msgBorrar" class="msg"></div>
+   </div>
+
+   <a class="volver" href="/">← Volver a Nexus</a>
+ </div>
+
+<script>
+function csrfToken(){ const m=document.cookie.match(/(?:^|;\s*)nexus_csrf=([^;]+)/); return m?decodeURIComponent(m[1]):""; }
+async function api(url, body){
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":csrfToken()},
+    body: body?JSON.stringify(body):null});
+  return r.json();
+}
+const $ = id => document.getElementById(id);
+function msg(el,t,ok){ el.textContent=t; el.className="msg "+(ok?"ok":"err"); }
+
+async function cargar(){
+  const r = await fetch("/api/cuenta"); if(!r.ok){ $("perfil").textContent="No disponible."; return; }
+  const d = await r.json();
+  $("perfil").innerHTML =
+    "Email: <b>"+(d.email||"—")+"</b><br>"+
+    "Plan: <span class='chip'>"+(d.plan||"free")+"</span><br>"+
+    "Alta: <b>"+(d.creado||"—")+"</b><br>"+
+    "2FA: <b>"+(d.twofa?"activado ✅":"desactivado")+"</b> · <a href='/seguridad' style='color:#38bdf8'>gestionar</a>";
+}
+
+$("btnPw").onclick = async () => {
+  const r = await api("/api/cuenta/password", {actual:$("pwActual").value, nueva:$("pwNueva").value});
+  if(r.ok){ msg($("msgPw"),"✓ Contraseña actualizada",true); $("pwActual").value=$("pwNueva").value=""; }
+  else msg($("msgPw"), r.error||"Error", false);
+};
+$("btnExport").onclick = () => { window.location = "/api/cuenta/exportar"; };
+$("btnBorrar").onclick = async () => {
+  if(!confirm("¿Seguro? Esto elimina tu cuenta y TODOS tus datos para siempre."))return;
+  const r = await api("/api/cuenta/borrar", {password:$("pwBorrar").value});
+  if(r.ok){ alert("Cuenta eliminada. Hasta pronto."); window.location="/login"; }
+  else msg($("msgBorrar"), r.error||"Error", false);
+};
+cargar();
+</script>
+</body>
+</html>
