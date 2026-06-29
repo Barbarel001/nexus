@@ -1,5 +1,5 @@
 # Despliegue de NEXUS con HTTPS automático (Caddy) en un comando:
-#   1) Edita el dominio en Caddyfile y las variables de .env (copia env.example a .env)
+#   1) Edita el dominio en Caddyfile y las variables de .env (copia .env.example a .env)
 #   2) docker compose up -d
 services:
   nexus:
