@@ -267,6 +267,7 @@
           <a class="btn-ic" id="adminBtn" href="/admin" title="Administración" style="display:none;align-items:center">🛠️</a>
           <a class="btn-ic" id="secBtn" href="/seguridad" title="Seguridad (2FA)" style="display:none;align-items:center">🔐</a>
           <a class="btn-ic" id="cuentaBtn" href="/cuenta" title="Mi cuenta" style="display:none;align-items:center">👤</a>
+          <button class="btn-ic" id="resumirBtn" title="Resumir esta conversación">📝</button>
           <button class="btn-ic" id="export" title="Exportar conversación a Markdown">⬇</button>
           <button class="btn-ic" id="settings" title="Ajustes">⚙</button>
           <button class="btn-ic" id="tts" title="Leer respuestas en voz alta">🔇</button>
@@ -322,6 +323,7 @@
           <input id="anPnl" placeholder="Resultado $ (+/-)" inputmode="decimal" autocomplete="off" />
           <button id="anAdd" title="Registrar operación">＋</button>
         </div>
+        <div id="anTrades" style="margin-top:6px"></div>
         <details style="margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--txt-faint)">🧮 Calculadora de riesgo</summary>
           <div class="add-row" style="margin-top:6px">
@@ -832,6 +834,20 @@ document.getElementById('export').addEventListener('click', async () => {
   a.click(); URL.revokeObjectURL(a.href);
 });
 
+/* ---------- Resumir conversación ---------- */
+document.getElementById('resumirBtn').addEventListener('click', async () => {
+  if(!cid || busy) return;
+  const btn = document.getElementById('resumirBtn');
+  btn.disabled = true; const prev = btn.textContent; btn.textContent = '…';
+  try{
+    const r = await fetch('/api/conversacion/' + cid + '/resumen', {method:'POST'});
+    const d = await r.json();
+    if(d.ok && d.resumen){ pinta('ai', '📝 **Resumen de la conversación**\n\n' + d.resumen); scrollEnd(); }
+    else alert(d.error || 'No pude resumir esta conversación.');
+  }catch(_){ alert('No pude resumir esta conversación.'); }
+  finally{ btn.disabled = false; btn.textContent = prev; }
+});
+
 /* ---------- Ajustes ---------- */
 const setBg = document.getElementById('setBg');
 document.getElementById('settings').addEventListener('click', () => {
@@ -947,6 +963,30 @@ async function refreshAnalitica(){
       'Win '+s.win_rate+'% · PF '+pf+' · Exp '+fmtMoney(s.expectancy)+'<br>'+
       s.n+' ops · '+s.ganadoras+'G/'+s.perdedoras+'P · DD '+fmtMoney(s.max_drawdown)+' · racha '+(s.racha>0?'+':'')+s.racha+'</div>';
     dibujarEquity(d.equity || []);
+  }catch(_){ }
+  renderTrades();
+}
+async function renderTrades(){
+  const cont = document.getElementById('anTrades'); if(!cont) return;
+  try{
+    const r = await fetch('/api/trades?n=6'); if(!r.ok) return;
+    const ops = (await r.json()).ops || [];
+    cont.innerHTML = '';
+    for(const o of ops){
+      const col = o.pnl>=0 ? 'var(--ok,#34d399)' : 'var(--bad,#f87171)';
+      const row = document.createElement('div'); row.className = 'trow';
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 2px';
+      row.innerHTML = '<span style="flex:1">'+esc(o.instrument)+
+        ' <span style="color:var(--txt-faint)">'+esc(o.fecha)+'</span></span>'+
+        '<b style="color:'+col+'">'+fmtMoney(o.pnl)+'</b>'+
+        '<span class="x" data-id="'+esc(o.id)+'" title="Eliminar" style="cursor:pointer;color:var(--txt-faint)">×</span>';
+      row.querySelector('.x').addEventListener('click', async () => {
+        await fetch('/api/trade/eliminar', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ref: o.id})});
+        refreshAnalitica();
+      });
+      cont.appendChild(row);
+    }
   }catch(_){ }
 }
 function dibujarEquity(serie){

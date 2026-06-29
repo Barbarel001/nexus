@@ -861,6 +861,28 @@ def trades_stats_api():
     return jsonify({"stats": s, "equity": analitica.curva_equity()})
 
 
+@app.route("/api/trades")
+def trades_lista_api():
+    """Lista las últimas operaciones registradas (más recientes primero)."""
+    ops = list(reversed(analitica.cargar()))
+    try:
+        n = int(request.args.get("n", 20))
+    except (TypeError, ValueError):
+        n = 20
+    return jsonify({"ops": ops[:max(1, min(n, 200))]})
+
+
+@app.route("/api/trade/eliminar", methods=["POST"])
+def trade_eliminar_api():
+    """Elimina una operación por su id."""
+    body = request.get_json(silent=True) or {}
+    ref = (body.get("ref") or "").strip()
+    if not ref:
+        return jsonify({"ok": False, "error": "falta ref"}), 400
+    msg = analitica.eliminar(ref)
+    return jsonify({"ok": "eliminada" in msg.lower(), "msg": msg})
+
+
 @app.route("/api/trade", methods=["POST"])
 def trade_agregar_api():
     """Registra una operacion cerrada (con su resultado) desde el panel."""
