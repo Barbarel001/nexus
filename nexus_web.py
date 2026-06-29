@@ -956,6 +956,23 @@ def renombrar_conv(cid):
     return jsonify({"ok": True, "titulo": titulo})
 
 
+@app.route("/api/conversacion/<cid>/resumen", methods=["POST"])
+def resumir_conv(cid):
+    """Resume una conversacion larga (titulo + viñetas) usando el modelo activo."""
+    data = cargar_convs()
+    c = buscar_conv(data, cid)
+    if not c:
+        return jsonify({"ok": False, "error": "no existe"}), 404
+    texto = "\n".join(f"{t['role']}: {t.get('text', '')}" for t in c.get("turnos", []))
+    if not texto.strip():
+        return jsonify({"ok": False, "error": "conversacion vacia"}), 400
+    try:
+        resumen = nexus.resumir_texto(texto)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({"ok": True, "resumen": resumen})
+
+
 @app.route("/api/nueva", methods=["POST"])
 def nueva_conv():
     # Devuelve un id; la conversacion se persiste al primer mensaje.

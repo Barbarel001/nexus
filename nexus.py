@@ -742,6 +742,42 @@ def analizar_imagen(image_b64: str, media_type: str = "image/jpeg",
 
 
 # ============================================================
+#  RESUMEN DE CONVERSACIONES  (cerebro: condensar charlas largas)
+# ============================================================
+
+def _completar_simple(prompt: str, model: str = None) -> str:
+    """Una sola respuesta de texto del modelo (sin herramientas). Para resumenes.
+    Usa Ollama si el backend es local; si no, la API de Claude."""
+    if BACKEND == "ollama":
+        import nexus_ollama
+        import urllib.request
+        payload = {"model": nexus_ollama.OLLAMA_MODEL, "prompt": prompt, "stream": False}
+        req = urllib.request.Request(
+            nexus_ollama.OLLAMA_HOST + "/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode("utf-8", "replace")).get("response", "").strip()
+    client = anthropic.Anthropic()
+    resp = client.messages.create(model=model or MODEL, max_tokens=1024,
+                                  messages=[{"role": "user", "content": prompt}])
+    return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+
+
+def resumir_texto(texto: str, completar=None) -> str:
+    """Resume una conversacion (o cualquier texto) en titulo + viñetas. `completar`
+    es inyectable para tests; por defecto llama al modelo."""
+    texto = (texto or "").strip()
+    if not texto:
+        return ""
+    completar = completar or _completar_simple
+    prompt = ("Resume esta conversacion de forma breve y util, en español. Empieza con un "
+              "titulo de una linea y despues 3-6 viñetas con lo esencial (decisiones, datos "
+              "y tareas pendientes). Se concreto:\n\n" + texto)
+    return completar(prompt)
+
+
+# ============================================================
 #  PROGRAMA PRINCIPAL
 # ============================================================
 
