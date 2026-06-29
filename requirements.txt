@@ -1,5 +1,5 @@
 anthropic>=0.40
-flask>=3.0
+flask>=3.1.3
 
 # Opcionales (instálalos solo si usas estas funciones):
 #   pywebpush>=2     -> notificaciones Web Push (avisos con la pestaña cerrada; ver nexus_push.py)
