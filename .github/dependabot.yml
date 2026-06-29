@@ -1,0 +1,21 @@
+# Dependabot: avisa y abre PRs cuando hay actualizaciones (incl. de seguridad)
+# de las dependencias de Python y de las GitHub Actions.
+# Docs: https://docs.github.com/code-security/dependabot
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencias", "seguridad"]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["ci"]
+    commit-message:
+      prefix: "ci"

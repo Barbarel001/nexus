@@ -75,9 +75,17 @@ def test_conversaciones_aisladas_web(monkeypatch, tmp_path):
     monkeypatch.setattr(tareas, "TAREAS_PATH", str(tmp_path / "tareas.json"))
     nexus_db.init()
     c = nexus_web.app.test_client()
-    # Usuario A crea una tarea (vía la herramienta seguraa través del panel API)
+
+    def tok():
+        r = c.get("/")
+        for h in r.headers.getlist("Set-Cookie"):
+            if "nexus_csrf=" in h:
+                return h.split("nexus_csrf=", 1)[1].split(";", 1)[0]
+        return ""
+
+    # Usuario A crea una tarea (vía la herramienta segura a través del panel API)
     c.post("/register", data={"email": "a@x.com", "password": "secreta1"})
-    c.post("/api/tarea/agregar", json={"texto": "tarea de A"})
+    c.post("/api/tarea/agregar", json={"texto": "tarea de A"}, headers={"X-CSRF-Token": tok()})
     assert any(t["texto"] == "tarea de A" for t in c.get("/api/panel").get_json()["tareas"])
     c.get("/logout")
     # Usuario B no ve las tareas de A
