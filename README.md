@@ -135,7 +135,15 @@ python nexus.py       # terminal client (full tool set)
 
 ## Configuration
 
-Everything is configurable via **environment variables** (no need to edit the code):
+Everything is configurable via **environment variables** (no need to edit the code).
+The full, commented list of every variable lives in **[`.env.example`](.env.example)** —
+copy it and fill in what you need:
+
+```bash
+cp .env.example .env   # then edit .env (it is git-ignored)
+```
+
+The most common ones:
 
 | Variable | Default | Purpose |
 |---|---|---|
