@@ -211,9 +211,39 @@ def _contar_metricas(resp):
     return resp
 
 
-LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS — Acceso</title>
-<style>
+# Cadenas de las páginas de acceso en ES/EN (login/registro/2FA). El idioma se elige
+# por la cabecera Accept-Language del navegador (sin sesión todavía).
+LOGIN_T = {
+    "es": {"acceso": "Acceso privado", "contra": "Contraseña", "entrar": "Entrar",
+           "email": "Email", "inicia": "Inicia sesión", "crear": "Crear cuenta",
+           "sincuenta": "¿Sin cuenta?", "twofa_sub": "Verificación en 2 pasos",
+           "codigo": "Código de 6 dígitos", "verificar": "Verificar",
+           "muchos": "Demasiados intentos. Espera unos minutos.",
+           "err_login": "Email o contraseña incorrectos.", "err_pass": "Contraseña incorrecta.",
+           "err_code": "Código incorrecto."},
+    "en": {"acceso": "Private access", "contra": "Password", "entrar": "Sign in",
+           "email": "Email", "inicia": "Sign in", "crear": "Create account",
+           "sincuenta": "No account?", "twofa_sub": "Two-step verification",
+           "codigo": "6-digit code", "verificar": "Verify",
+           "muchos": "Too many attempts. Wait a few minutes.",
+           "err_login": "Wrong email or password.", "err_pass": "Wrong password.",
+           "err_code": "Wrong code."},
+}
+
+
+def _idioma() -> str:
+    """Idioma de la petición (es/en) según Accept-Language; por defecto 'es'."""
+    try:
+        return request.accept_languages.best_match(["es", "en"]) or "es"
+    except Exception:
+        return "es"
+
+
+def _login_t():
+    return LOGIN_T.get(_idioma(), LOGIN_T["es"])
+
+
+_CSS_LOGIN = """<style>
  *{box-sizing:border-box} html,body{height:100%;margin:0}
  body{font-family:system-ui,'Segoe UI',Roboto,sans-serif;background:radial-gradient(900px 500px at 60% -160px,rgba(56,189,248,.10),transparent 70%),#0a0f1a;
    color:#e6edf5;display:flex;align-items:center;justify-content:center}
@@ -225,27 +255,34 @@ LOGIN_HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
  button{width:100%;height:46px;background:#38bdf8;border:none;color:#04121d;font-weight:600;font-size:15px;border-radius:11px;cursor:pointer}
  button:hover{filter:brightness(1.08)}
  .err{color:#f87171;font-size:13px;text-align:center;margin-bottom:12px;min-height:18px}
-</style></head><body>
+</style>"""
+
+_HEAD = ('<!DOCTYPE html><html lang="{{ lang }}"><head><meta charset="UTF-8">'
+         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+         '<title>NEXUS</title>' + _CSS_LOGIN + '</head><body>')
+
+# Login de una sola contraseña.
+LOGIN_HTML = _HEAD + """
  <form class="box" method="POST" action="/login">
-   <div class="logo">NEXUS</div><div class="sub">Acceso privado</div>
+   <div class="logo">NEXUS</div><div class="sub">{{ s.acceso }}</div>
    <div class="err">{{ error }}</div>
-   <input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">
-   <button type="submit">Entrar</button>
+   <input type="password" name="password" placeholder="{{ s.contra }}" autofocus autocomplete="current-password">
+   <button type="submit">{{ s.entrar }}</button>
  </form>
 </body></html>"""
 
-# Pagina de login/registro para el modo multiusuario (email + contraseña).
-MULTIUSER_LOGIN_HTML = LOGIN_HTML.replace(
-    '<div class="sub">Acceso privado</div>',
-    '<div class="sub">{{ modo_sub }}</div>'
-).replace(
-    '<input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">\n   <button type="submit">Entrar</button>',
-    '<input type="email" name="email" placeholder="Email" autofocus autocomplete="email">\n'
-    '   <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password">\n'
-    '   <button type="submit" formaction="/login">Entrar</button>\n'
-    '   <div style="text-align:center;margin-top:12px;font-size:13px;color:#94a6bd">¿Sin cuenta?</div>\n'
-    '   <button type="submit" formaction="/register" style="background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3);margin-top:8px">Crear cuenta</button>'
-)
+# Login/registro multiusuario (email + contraseña).
+MULTIUSER_LOGIN_HTML = _HEAD + """
+ <form class="box" method="POST" action="/login">
+   <div class="logo">NEXUS</div><div class="sub">{{ modo_sub }}</div>
+   <div class="err">{{ error }}</div>
+   <input type="email" name="email" placeholder="{{ s.email }}" autofocus autocomplete="email">
+   <input type="password" name="password" placeholder="{{ s.contra }}" autocomplete="current-password">
+   <button type="submit" formaction="/login">{{ s.entrar }}</button>
+   <div style="text-align:center;margin-top:12px;font-size:13px;color:#94a6bd">{{ s.sincuenta }}</div>
+   <button type="submit" formaction="/register" style="background:transparent;color:#38bdf8;border:1px solid rgba(56,189,248,.3);margin-top:8px">{{ s.crear }}</button>
+ </form>
+</body></html>"""
 
 
 def _auth_requerida() -> bool:
@@ -285,9 +322,10 @@ def login():
     if not _auth_requerida():
         return redirect("/")
     error = ""
+    s, lang = _login_t(), _idioma()
     ip = request.remote_addr or "?"
     if request.method == "POST" and not _rate_limit_ok(ip):
-        return ("Demasiados intentos. Espera unos minutos.", 429)
+        return (s["muchos"], 429)
     if NEXUS_MULTIUSER:
         if request.method == "POST":
             u = nexus_db.autenticar(request.form.get("email", ""), request.form.get("password", ""))
@@ -299,15 +337,17 @@ def login():
                     session.clear()
                     session["pending_2fa"] = u["id"]
                     session["pending_email"] = u["email"]
-                    return render_template_string(TWOFA_HTML, error="", csrf_token=_csrf_token())
+                    return render_template_string(TWOFA_HTML, error="", csrf_token=_csrf_token(),
+                                                  s=s, lang=lang)
                 session["auth"] = True
                 session["user_id"] = u["id"]
                 session["email"] = u["email"]
                 session.permanent = True
                 return redirect("/")
             _registrar_fallo(ip)
-            error = "Email o contraseña incorrectos."
-        return render_template_string(MULTIUSER_LOGIN_HTML, error=error, modo_sub="Inicia sesión")
+            error = s["err_login"]
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=error, modo_sub=s["inicia"],
+                                      s=s, lang=lang)
     # Modo de una sola contraseña.
     if request.method == "POST":
         if hmac.compare_digest(request.form.get("password", ""), NEXUS_PASSWORD):
@@ -316,8 +356,8 @@ def login():
             session.permanent = True
             return redirect("/")
         _registrar_fallo(ip)
-        error = "Contraseña incorrecta."
-    return render_template_string(LOGIN_HTML, error=error)
+        error = s["err_pass"]
+    return render_template_string(LOGIN_HTML, error=error, s=s, lang=lang)
 
 
 @app.route("/register", methods=["POST"])
@@ -327,7 +367,9 @@ def register():
     try:
         u = nexus_db.crear_usuario(request.form.get("email", ""), request.form.get("password", ""))
     except ValueError as e:
-        return render_template_string(MULTIUSER_LOGIN_HTML, error=str(e), modo_sub="Crear cuenta")
+        s = _login_t()
+        return render_template_string(MULTIUSER_LOGIN_HTML, error=str(e), modo_sub=s["crear"],
+                                      s=s, lang=_idioma())
     session["auth"] = True
     session["user_id"] = u["id"]
     session["email"] = u["email"]
@@ -342,20 +384,15 @@ def logout():
 
 
 # --------- 2FA: pagina de desafio (segundo factor tras la contraseña) ---------
-TWOFA_HTML = LOGIN_HTML.replace(
-    '<div class="sub">Acceso privado</div>',
-    '<div class="sub">Verificación en 2 pasos</div>'
-).replace(
-    '<form class="box" method="POST" action="/login">',
-    '<form class="box" method="POST" action="/login/2fa">'
-).replace(
-    '<input type="password" name="password" placeholder="Contraseña" autofocus autocomplete="current-password">\n   <button type="submit">Entrar</button>',
-    '<input type="hidden" name="csrf_token" value="{{ csrf_token }}">\n'
-    '   <input type="text" name="code" placeholder="Código de 6 dígitos" autofocus '
-    'inputmode="numeric" autocomplete="one-time-code" maxlength="6" '
-    'style="text-align:center;letter-spacing:6px;font-size:20px">\n'
-    '   <button type="submit">Verificar</button>'
-)
+TWOFA_HTML = _HEAD + """
+ <form class="box" method="POST" action="/login/2fa">
+   <div class="logo">NEXUS</div><div class="sub">{{ s.twofa_sub }}</div>
+   <div class="err">{{ error }}</div>
+   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <input type="text" name="code" placeholder="{{ s.codigo }}" autofocus inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="text-align:center;letter-spacing:6px;font-size:20px">
+   <button type="submit">{{ s.verificar }}</button>
+ </form>
+</body></html>"""
 
 
 @app.route("/login/2fa", methods=["POST"])
@@ -364,8 +401,9 @@ def login_2fa():
     if not uid:
         return redirect("/login")
     ip = request.remote_addr or "?"
+    s, lang = _login_t(), _idioma()
     if not _rate_limit_ok(ip):
-        return ("Demasiados intentos. Espera unos minutos.", 429)
+        return (s["muchos"], 429)
     secret, enabled = nexus_db.get_totp(uid)
     if enabled and nexus_totp.verificar(secret, request.form.get("code", "")):
         _limpiar_intentos(ip)
@@ -377,8 +415,8 @@ def login_2fa():
         session.permanent = True
         return redirect("/")
     _registrar_fallo(ip)
-    return render_template_string(TWOFA_HTML, error="Código incorrecto.",
-                                  csrf_token=_csrf_token())
+    return render_template_string(TWOFA_HTML, error=s["err_code"],
+                                  csrf_token=_csrf_token(), s=s, lang=lang)
 
 # Registro de confirmaciones pendientes (handshake SSE <-> /api/confirm).
 _pendientes = {}
