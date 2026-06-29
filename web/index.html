@@ -329,6 +329,18 @@
           <input id="anPnl" placeholder="Resultado $ (+/-)" inputmode="decimal" autocomplete="off" />
           <button id="anAdd" title="Registrar operación">＋</button>
         </div>
+        <details style="margin-top:6px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--txt-faint)">➕ Más detalles (opcional)</summary>
+          <div class="add-row" style="margin-top:6px">
+            <select id="anLado" style="background:var(--panel-2);border:1px solid var(--line-2);color:var(--txt);border-radius:8px;font-size:12px">
+              <option value="">Lado</option><option value="long">Long</option><option value="short">Short</option>
+            </select>
+            <input id="anEntrada" placeholder="Entrada" inputmode="decimal" autocomplete="off"/>
+            <input id="anSalida" placeholder="Salida" inputmode="decimal" autocomplete="off"/>
+            <input id="anR" placeholder="R" inputmode="decimal" autocomplete="off"/>
+          </div>
+          <input id="anNotas" placeholder="Notas / lección" autocomplete="off" style="width:100%;margin-top:6px"/>
+        </details>
         <div id="anTrades" style="margin-top:6px"></div>
         <details style="margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--txt-faint)">🧮 Calculadora de riesgo</summary>
@@ -495,6 +507,22 @@
     return origFetch(url, opts);
   };
 })();
+// --- Toasts: avisos no intrusivos (sustituyen a alert() en acciones del panel) ---
+function toast(msg, tipo){
+  let cont = document.getElementById('toastCont');
+  if(!cont){
+    cont = document.createElement('div'); cont.id = 'toastCont';
+    cont.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center';
+    document.body.appendChild(cont);
+  }
+  const t = document.createElement('div');
+  const col = tipo === 'err' ? 'rgba(248,113,113,.95)' : (tipo === 'ok' ? 'rgba(34,197,94,.95)' : 'rgba(30,41,59,.97)');
+  t.style.cssText = 'background:'+col+';color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;'+
+    'box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:80vw;opacity:0;transition:opacity .2s,transform .2s;transform:translateY(8px)';
+  t.textContent = msg; cont.appendChild(t);
+  requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 250); }, 3200);
+}
 const chat = document.getElementById('chat');
 const form = document.getElementById('form');
 const inp  = document.getElementById('inp');
@@ -849,8 +877,8 @@ document.getElementById('resumirBtn').addEventListener('click', async () => {
     const r = await fetch('/api/conversacion/' + cid + '/resumen', {method:'POST'});
     const d = await r.json();
     if(d.ok && d.resumen){ pinta('ai', '📝 **Resumen de la conversación**\n\n' + d.resumen); scrollEnd(); }
-    else alert(d.error || 'No pude resumir esta conversación.');
-  }catch(_){ alert('No pude resumir esta conversación.'); }
+    else toast(d.error || 'No pude resumir esta conversación.', 'err');
+  }catch(_){ toast('No pude resumir esta conversación.', 'err'); }
   finally{ btn.disabled = false; btn.textContent = prev; }
 });
 
@@ -979,10 +1007,11 @@ async function refreshAnalitica(){
     if(!s.n){ el.textContent = 'Sin operaciones aún.'; document.getElementById('anEquity').style.display='none'; return; }
     const pf = s.profit_factor_infinito ? '∞' : (s.profit_factor ?? '—');
     const col = s.pnl_total>=0 ? 'var(--ok,#34d399)' : 'var(--bad,#f87171)';
+    const rTxt = (s.avg_r!=null) ? ' · R '+s.avg_r : '';
     el.innerHTML =
       '<div style="font-size:18px;font-weight:600;color:'+col+'">'+fmtMoney(s.pnl_total)+'</div>'+
       '<div style="font-size:11px;color:var(--txt-faint);line-height:1.6;margin-top:2px">'+
-      'Win '+s.win_rate+'% · PF '+pf+' · Exp '+fmtMoney(s.expectancy)+'<br>'+
+      'Win '+s.win_rate+'% · PF '+pf+' · Exp '+fmtMoney(s.expectancy)+rTxt+'<br>'+
       s.n+' ops · '+s.ganadoras+'G/'+s.perdedoras+'P · DD '+fmtMoney(s.max_drawdown)+' · racha '+(s.racha>0?'+':'')+s.racha+'</div>';
     dibujarEquity(d.equity || []);
   }catch(_){ }
@@ -998,8 +1027,16 @@ async function renderTrades(){
       const col = o.pnl>=0 ? 'var(--ok,#34d399)' : 'var(--bad,#f87171)';
       const row = document.createElement('div'); row.className = 'trow';
       row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 2px';
+      // Detalle opcional: lado, entrada→salida, R; notas como tooltip.
+      const extra = [];
+      if(o.lado) extra.push(o.lado==='long'?'L':'S');
+      if(o.entrada!=null && o.salida!=null) extra.push(o.entrada+'→'+o.salida);
+      if(o.r!=null) extra.push(o.r+'R');
+      const sub = extra.length ? ' <span style="color:var(--txt-faint);font-size:10px">'+esc(extra.join(' · '))+'</span>' : '';
+      const tip = o.notas ? esc(o.notas) : (o.instrument+' '+o.fecha);
+      row.title = tip;
       row.innerHTML = '<span style="flex:1">'+esc(o.instrument)+
-        ' <span style="color:var(--txt-faint)">'+esc(o.fecha)+'</span></span>'+
+        ' <span style="color:var(--txt-faint)">'+esc(o.fecha)+'</span>'+sub+'</span>'+
         '<b style="color:'+col+'">'+fmtMoney(o.pnl)+'</b>'+
         '<span class="x" data-id="'+esc(o.id)+'" title="Eliminar" style="cursor:pointer;color:var(--txt-faint)">×</span>';
       row.querySelector('.x').addEventListener('click', async () => {
@@ -1025,12 +1062,21 @@ function dibujarEquity(serie){
   ctx.strokeStyle = serie[serie.length-1]>=0 ? '#34d399' : '#f87171'; ctx.lineWidth=2; ctx.stroke();
 }
 async function addTrade(){
-  const inst = document.getElementById('anInst').value.trim();
-  const pnl = document.getElementById('anPnl').value.trim();
-  if(!inst || pnl===''){ return; }
-  const r = await fetch('/api/trade', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({instrument: inst, pnl: parseFloat(pnl)})});
-  if((await r.json()).ok){ document.getElementById('anInst').value=''; document.getElementById('anPnl').value=''; refreshAnalitica(); }
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const inst = v('anInst').trim(); const pnl = v('anPnl').trim();
+  if(!inst || pnl===''){ toast('Indica instrumento y resultado.', 'err'); return; }
+  const cuerpo = {instrument: inst, pnl: parseFloat(pnl)};
+  if(v('anLado')) cuerpo.lado = v('anLado');
+  if(v('anEntrada')) cuerpo.entrada = v('anEntrada');
+  if(v('anSalida')) cuerpo.salida = v('anSalida');
+  if(v('anR')) cuerpo.r = v('anR');
+  if(v('anNotas').trim()) cuerpo.notas = v('anNotas').trim();
+  const r = await fetch('/api/trade', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo)});
+  const d = await r.json();
+  if(d.ok){
+    ['anInst','anPnl','anEntrada','anSalida','anR','anNotas'].forEach(i => { const e=document.getElementById(i); if(e) e.value=''; });
+    toast('Operación registrada', 'ok'); refreshAnalitica();
+  } else toast(d.error || 'No pude registrar la operación', 'err');
 }
 async function calcRiesgo(){
   const q = new URLSearchParams({saldo:rSaldo.value, riesgo_pct:rPct.value, entrada:rEnt.value, stop:rStop.value, valor_por_punto:(rVpp.value||1)});

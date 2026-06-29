@@ -58,8 +58,9 @@ def _lado(v: str) -> str:
 
 
 def registrar(instrument: str, pnl, lado: str = "", qty=0,
-              entrada=None, salida=None, notas: str = "", fecha: str = "") -> dict:
-    """Registra una operacion cerrada. 'pnl' (resultado en dinero, +/-) es obligatorio."""
+              entrada=None, salida=None, notas: str = "", fecha: str = "", r=None) -> dict:
+    """Registra una operacion cerrada. 'pnl' (resultado en dinero, +/-) es obligatorio.
+    'r' es el R-multiplo opcional (cuantas veces el riesgo ganaste/perdiste)."""
     inst = (instrument or "").strip().upper()
     if not inst:
         raise ValueError("Falta el instrumento.")
@@ -75,6 +76,7 @@ def registrar(instrument: str, pnl, lado: str = "", qty=0,
         q = int(float(qty)) if qty not in (None, "") else 0
     except (TypeError, ValueError):
         q = 0
+    rv = _num(r, "r")
     op = {
         "id": uuid.uuid4().hex[:6],
         "fecha": f,
@@ -84,6 +86,7 @@ def registrar(instrument: str, pnl, lado: str = "", qty=0,
         "entrada": _num(entrada, "entrada"),
         "salida": _num(salida, "salida"),
         "pnl": round(p, 2),
+        "r": round(rv, 2) if rv is not None else None,
         "notas": (notas or "").strip(),
     }
     ops = cargar()
@@ -196,6 +199,8 @@ def estadisticas(ops: list = None) -> dict:
     for o in ops:
         k = o.get("instrument", "?")
         por_inst[k] = round(por_inst.get(k, 0.0) + float(o.get("pnl", 0)), 2)
+    rs = [float(o["r"]) for o in ops if o.get("r") is not None]
+    avg_r = round(sum(rs) / len(rs), 2) if rs else None
     return {
         "n": n,
         "ganadoras": len(ganadoras),
@@ -212,6 +217,7 @@ def estadisticas(ops: list = None) -> dict:
         "peor": round(min(pnls), 2),
         "max_drawdown": max_drawdown(ops),
         "racha": _racha(ops),
+        "avg_r": avg_r,
         "por_instrumento": por_inst,
     }
 
@@ -256,7 +262,7 @@ def tool_registrar_trade(args: dict) -> str:
     try:
         o = registrar(args.get("instrument"), args.get("pnl"), args.get("lado", ""),
                       args.get("qty", 0), args.get("entrada"), args.get("salida"),
-                      args.get("notas", ""), args.get("fecha", ""))
+                      args.get("notas", ""), args.get("fecha", ""), args.get("r"))
     except ValueError as e:
         return f"No pude registrar la operacion: {e}"
     signo = "🟢" if o["pnl"] > 0 else ("🔴" if o["pnl"] < 0 else "⚪")
@@ -278,6 +284,7 @@ def tool_stats_trading(args: dict = None) -> str:
         f"  Mejor / peor  : {MONEDA}{s['mejor']} / {MONEDA}{s['peor']}\n"
         f"  Max drawdown  : {MONEDA}{s['max_drawdown']}\n"
         f"  Racha actual  : {s['racha']:+d}"
+        + (f"\n  R medio       : {s['avg_r']}R" if s.get("avg_r") is not None else "")
     )
 
 
@@ -312,6 +319,7 @@ ANALITICA_TOOLS = [
                 "salida": {"type": "number", "description": "Precio de salida (opcional)."},
                 "notas": {"type": "string", "description": "Notas/lecciones (opcional)."},
                 "fecha": {"type": "string", "description": "Fecha AAAA-MM-DD (defecto hoy)."},
+                "r": {"type": "number", "description": "R-multiplo opcional (ganancia/perdida en multiplos del riesgo)."},
             },
             "required": ["instrument", "pnl"],
         },

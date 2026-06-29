@@ -898,7 +898,7 @@ def trade_agregar_api():
         o = analitica.registrar(body.get("instrument", ""), body.get("pnl"),
                                 body.get("lado", ""), body.get("qty", 0),
                                 body.get("entrada"), body.get("salida"),
-                                body.get("notas", ""), body.get("fecha", ""))
+                                body.get("notas", ""), body.get("fecha", ""), body.get("r"))
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "op": o})
