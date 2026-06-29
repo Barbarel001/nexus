@@ -251,7 +251,7 @@
     <aside class="sidebar" id="sidebar">
       <button class="sb-new" id="new" data-i18n="newConv">＋ Nueva conversación</button>
       <input class="search" id="search" data-i18n-ph="search.ph" placeholder="🔍 Buscar…" autocomplete="off" />
-      <span class="sb-title">Historial</span>
+      <span class="sb-title" data-i18n="hist">Historial</span>
       <div class="conv-list" id="convList"></div>
       <div class="sb-foot" id="sbFoot"></div>
     </aside>
@@ -261,7 +261,7 @@
         <button class="btn-ic hamb" id="hamb" title="Menú">☰</button>
         <div class="brand"><div class="logo">NEXUS</div><div class="sub" data-i18n="app.sub">Asistente IA</div></div>
         <div class="controls">
-          <span class="badge"><span class="led"></span> En línea</span>
+          <span class="badge"><span class="led"></span> <span data-i18n="online">En línea</span></span>
           <button class="btn-ic" id="dashBtn" data-i18n-title="t.dash" title="Panel (trading y tareas)">📊</button>
           <button class="btn-ic" id="memBtn" data-i18n-title="t.mem" title="Memoria de Nexus">🧠</button>
           <a class="btn-ic" id="adminBtn" href="/admin" data-i18n-title="t.admin" title="Administración" style="display:none;align-items:center">🛠️</a>
@@ -290,16 +290,16 @@
       <div class="dash-head">
         <span class="logo-sm" data-i18n="panel">PANEL</span>
         <span style="margin-left:auto;display:flex;gap:5px">
-          <button class="btn-ic" id="newsBtn" title="Noticias de mercado" style="min-width:32px;height:30px">📰</button>
-          <button class="btn-ic" id="climaBtn" title="Clima" style="min-width:32px;height:30px">🌤️</button>
-          <button class="btn-ic" id="gastosBtn" title="Gastos del mes" style="min-width:32px;height:30px">💸</button>
-          <button class="btn-ic" id="dashRefresh" title="Actualizar" style="min-width:32px;height:30px">↻</button>
+          <button class="btn-ic" id="newsBtn" data-i18n-title="t.news" title="Noticias de mercado" style="min-width:32px;height:30px">📰</button>
+          <button class="btn-ic" id="climaBtn" data-i18n-title="t.clima" title="Clima" style="min-width:32px;height:30px">🌤️</button>
+          <button class="btn-ic" id="gastosBtn" data-i18n-title="t.gastos" title="Gastos del mes" style="min-width:32px;height:30px">💸</button>
+          <button class="btn-ic" id="dashRefresh" data-i18n-title="t.refresh" title="Actualizar" style="min-width:32px;height:30px">↻</button>
         </span>
-        <button class="x" id="dashClose" title="Cerrar">×</button>
+        <button class="x" id="dashClose" data-i18n-title="t.close" title="Cerrar">×</button>
       </div>
 
       <div class="sect">
-        <div class="sect-h">📈 <span data-i18n="sect.nt">NinjaTrader</span> <button class="mini" id="diarioBtn" title="Diario de trading">📒</button></div>
+        <div class="sect-h">📈 <span data-i18n="sect.nt">NinjaTrader</span> <button class="mini" id="diarioBtn" data-i18n-title="t.diario" title="Diario de trading">📒</button></div>
         <div class="card">
           <div class="nt-stat" id="ntStatus"><span class="led off"></span> …</div>
           <div class="nt-acct" id="ntAcct"></div>
@@ -378,13 +378,13 @@
       <div class="sect">
         <div class="sect-h">✅ <span data-i18n="sect.tareas">Tareas</span> <span class="n" id="tareasN">0</span></div>
         <div class="tabs" id="tareaTabs">
-          <button class="tab active" data-f="pendientes">Pendientes</button>
-          <button class="tab" data-f="hoy">Hoy</button>
-          <button class="tab" data-f="vencidas">Vencidas</button>
+          <button class="tab active" data-f="pendientes" data-i18n="tab.pend">Pendientes</button>
+          <button class="tab" data-f="hoy" data-i18n="tab.hoy">Hoy</button>
+          <button class="tab" data-f="vencidas" data-i18n="tab.venc">Vencidas</button>
         </div>
         <div id="tareasList"></div>
         <div class="add-row">
-          <input id="tareaInp" placeholder="Nueva tarea (añade 'hoy' o 'manana')" autocomplete="off" />
+          <input id="tareaInp" data-i18n-ph="ph.tarea" placeholder="Nueva tarea (añade 'hoy' o 'manana')" autocomplete="off" />
           <button id="tareaAdd" title="Añadir tarea">＋</button>
         </div>
       </div>
@@ -411,7 +411,7 @@
       <div class="modal-sub">Lo que Nexus recuerda de ti entre sesiones.</div>
       <div id="memList" style="max-height:300px;overflow:auto;margin-bottom:12px"></div>
       <div class="add-row">
-        <input id="memInp" placeholder="Recordar algo nuevo…" autocomplete="off" />
+        <input id="memInp" data-i18n-ph="ph.mem" placeholder="Recordar algo nuevo…" autocomplete="off" />
         <button id="memAdd" title="Recordar">＋</button>
       </div>
       <div class="modal-actions"><button class="m-btn ghost" id="memClose">Cerrar</button></div>
@@ -421,12 +421,12 @@
   <!-- Modal: onboarding (primer arranque) -->
   <div class="modal-bg" id="onbBg">
     <div class="modal">
-      <div class="modal-h">👋 Bienvenido a NEXUS</div>
-      <div class="modal-sub">Esto es lo que puedes conectar. Lo verde ya está listo; lo demás es opcional.</div>
+      <div class="modal-h" data-i18n="onb.title">👋 Bienvenido a NEXUS</div>
+      <div class="modal-sub" data-i18n="onb.sub">Esto es lo que puedes conectar. Lo verde ya está listo; lo demás es opcional.</div>
       <div id="onbList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
       <div class="modal-actions">
-        <button class="m-btn ghost" id="onbSkip">No mostrar más</button>
-        <button class="m-btn" id="onbClose">Entendido</button>
+        <button class="m-btn ghost" id="onbSkip" data-i18n="onb.skip">No mostrar más</button>
+        <button class="m-btn" id="onbClose" data-i18n="onb.ok">Entendido</button>
       </div>
     </div>
   </div>
@@ -467,22 +467,22 @@
   <!-- Modal: ajustes -->
   <div class="modal-bg" id="setBg">
     <div class="modal">
-      <div class="modal-h">⚙ Ajustes</div>
-      <div class="modal-sub">Se guardan en este navegador.</div>
+      <div class="modal-h" data-i18n="set.title">⚙ Ajustes</div>
+      <div class="modal-sub" data-i18n="set.sub">Se guardan en este navegador.</div>
       <label class="fld"><span data-i18n="lang">Idioma</span><select id="setLang">
         <option value="es">Español</option><option value="en">English</option></select></label>
-      <label class="fld"><span>Modelo</span><select id="setModel"></select></label>
-      <label class="fld"><span>¿Cómo quieres que Nexus te llame?</span><input type="text" id="setNombre" placeholder="Señor" /></label>
-      <label class="fld"><span>Tema</span><select id="setTheme">
-        <option value="dark">Oscuro</option><option value="light">Claro</option></select></label>
-      <label class="fld"><span>Color de acento</span><select id="setAccent">
+      <label class="fld"><span data-i18n="set.modelo">Modelo</span><select id="setModel"></select></label>
+      <label class="fld"><span data-i18n="set.nombre">¿Cómo quieres que Nexus te llame?</span><input type="text" id="setNombre" data-i18n-ph="ph.nombre" placeholder="Señor" /></label>
+      <label class="fld"><span data-i18n="set.tema">Tema</span><select id="setTheme">
+        <option value="dark" data-i18n="set.oscuro">Oscuro</option><option value="light" data-i18n="set.claro">Claro</option></select></label>
+      <label class="fld"><span data-i18n="set.accent">Color de acento</span><select id="setAccent">
         <option value="cian">Cian</option><option value="violeta">Violeta</option>
         <option value="verde">Verde</option><option value="ambar">Ámbar</option></select></label>
-      <label class="fld"><span>Ciudad para el clima</span><input type="text" id="setCiudad" placeholder="Ej. Madrid" /></label>
-      <label class="fld row2"><input type="checkbox" id="setTts" /><span>Leer las respuestas en voz alta por defecto</span></label>
+      <label class="fld"><span data-i18n="set.ciudad">Ciudad para el clima</span><input type="text" id="setCiudad" data-i18n-ph="ph.ciudad" placeholder="Ej. Madrid" /></label>
+      <label class="fld row2"><input type="checkbox" id="setTts" /><span data-i18n="set.tts">Leer las respuestas en voz alta por defecto</span></label>
       <div class="modal-actions">
-        <button class="m-btn ghost" id="setCancel">Cerrar</button>
-        <button class="m-btn" id="setSave">Guardar</button>
+        <button class="m-btn ghost" id="setCancel" data-i18n="set.cerrar">Cerrar</button>
+        <button class="m-btn" id="setSave" data-i18n="set.guardar">Guardar</button>
       </div>
     </div>
   </div>
@@ -536,6 +536,19 @@ const I18N = {
     't.export':'Exportar conversación a Markdown', 't.settings':'Ajustes', 't.tts':'Leer respuestas en voz alta',
     't.admin':'Administración', 't.sec':'Seguridad (2FA)', 't.cuenta':'Mi cuenta',
     'empty.tareas':'Nada por aquí 🎉', 'empty.alertas':'Sin alertas', 'empty.trades':'Sin operaciones aún.',
+    'online':'En línea', 'hist':'Historial',
+    't.news':'Noticias de mercado', 't.clima':'Clima', 't.gastos':'Gastos del mes',
+    't.refresh':'Actualizar', 't.close':'Cerrar', 't.diario':'Diario de trading',
+    'tab.pend':'Pendientes', 'tab.hoy':'Hoy', 'tab.venc':'Vencidas',
+    'ph.tarea':"Nueva tarea (añade 'hoy' o 'manana')", 'ph.mem':'Recordar algo nuevo…',
+    'onb.skip':'No mostrar más', 'onb.ok':'Entendido',
+    'onb.title':'👋 Bienvenido a NEXUS',
+    'onb.sub':'Esto es lo que puedes conectar. Lo verde ya está listo; lo demás es opcional.',
+    'set.title':'⚙ Ajustes', 'set.sub':'Se guardan en este navegador.', 'set.modelo':'Modelo',
+    'set.nombre':'¿Cómo quieres que Nexus te llame?', 'set.tema':'Tema', 'set.oscuro':'Oscuro',
+    'set.claro':'Claro', 'set.accent':'Color de acento', 'set.ciudad':'Ciudad para el clima',
+    'set.tts':'Leer las respuestas en voz alta por defecto', 'set.cerrar':'Cerrar', 'set.guardar':'Guardar',
+    'ph.nombre':'Señor', 'ph.ciudad':'Ej. Madrid',
   },
   en: {
     'app.sub':'AI assistant', 'newConv':'＋ New chat', 'search.ph':'🔍 Search…',
@@ -546,6 +559,19 @@ const I18N = {
     't.export':'Export conversation to Markdown', 't.settings':'Settings', 't.tts':'Read replies aloud',
     't.admin':'Administration', 't.sec':'Security (2FA)', 't.cuenta':'My account',
     'empty.tareas':'All clear 🎉', 'empty.alertas':'No alerts', 'empty.trades':'No trades yet.',
+    'online':'Online', 'hist':'History',
+    't.news':'Market news', 't.clima':'Weather', 't.gastos':'This month’s expenses',
+    't.refresh':'Refresh', 't.close':'Close', 't.diario':'Trading journal',
+    'tab.pend':'Pending', 'tab.hoy':'Today', 'tab.venc':'Overdue',
+    'ph.tarea':"New task (add 'today' or 'tomorrow')", 'ph.mem':'Remember something new…',
+    'onb.skip':'Don’t show again', 'onb.ok':'Got it',
+    'onb.title':'👋 Welcome to NEXUS',
+    'onb.sub':'Here’s what you can connect. Green is ready; the rest is optional.',
+    'set.title':'⚙ Settings', 'set.sub':'Saved in this browser.', 'set.modelo':'Model',
+    'set.nombre':'How should Nexus call you?', 'set.tema':'Theme', 'set.oscuro':'Dark',
+    'set.claro':'Light', 'set.accent':'Accent color', 'set.ciudad':'City for weather',
+    'set.tts':'Read replies aloud by default', 'set.cerrar':'Close', 'set.guardar':'Save',
+    'ph.nombre':'Sir', 'ph.ciudad':'e.g. Madrid',
   },
 };
 let LANG = localStorage.getItem('nexus_lang') || (navigator.language || 'es').slice(0,2).toLowerCase();
