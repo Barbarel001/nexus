@@ -33,3 +33,23 @@ def test_metrics_requiere_admin_en_multiuser(monkeypatch, tmp_path):
     c = nexus_web.app.test_client()
     c.post("/register", data={"email": "normal@x.com", "password": "secreta1"})
     assert c.get("/api/metrics").status_code == 403   # logueado pero no admin
+
+
+# --------------------------- Mensajes de error del chat ---------------------------
+
+def test_error_amable_api_key():
+    m = nexus_web._error_amable(Exception("Error code: 401 - invalid x-api-key"))
+    assert "ANTHROPIC_API_KEY" in m and "console.anthropic.com" in m
+
+
+def test_error_amable_ollama_caido():
+    m = nexus_web._error_amable(Exception("<urlopen error [Errno 111] Connection refused>"), ollama=True)
+    assert "Ollama" in m and "ollama.com" in m
+
+
+def test_error_amable_saturado():
+    assert "satur" in nexus_web._error_amable(Exception("429 rate limit")).lower()
+
+
+def test_error_amable_generico():
+    assert nexus_web._error_amable(Exception("algo raro")).startswith("No pude completar")
