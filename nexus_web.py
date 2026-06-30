@@ -513,6 +513,28 @@ def sse(event: str, data) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _error_amable(e, ollama: bool = False) -> str:
+    """Traduce errores técnicos del modelo a un mensaje claro y accionable para el chat."""
+    t = str(e).lower()
+    if ollama or "11434" in t or "ollama" in t:
+        if any(s in t for s in ("refused", "connection", "max retries", "timed out", "urlopen", "failed to establish")):
+            return ("No encuentro Ollama (el modelo local). Instálalo desde https://ollama.com y "
+                    "ejecuta `ollama pull qwen2.5:7b`, o usa una API key de Anthropic para el chat. "
+                    "El resto de Nexus (panel, analítica, tareas) funciona igual.")
+        return f"El modelo local (Ollama) dio un error: {e}"
+    if "401" in t or "authentication" in t or "invalid x-api-key" in t or "api-key" in t or "api key" in t:
+        return ("Tu ANTHROPIC_API_KEY no es válida o falta. Consíguela en "
+                "https://console.anthropic.com y vuelve a arrancar Nexus con ella, o usa el modo "
+                "local con Ollama. (El panel y la analítica funcionan sin clave.)")
+    if "429" in t or "rate limit" in t or "overloaded" in t or "529" in t:
+        return "El servicio de IA está saturado o alcanzaste el límite. Espera unos segundos y reintenta."
+    if "credit" in t or "billing" in t or "quota" in t or "insufficient" in t:
+        return "Tu cuenta de Anthropic no tiene crédito disponible. Revisa la facturación en console.anthropic.com."
+    if any(s in t for s in ("timed out", "timeout", "connection", "network", "urlopen", "getaddrinfo")):
+        return "Problema de conexión a internet al hablar con la IA. Comprueba tu red y reintenta."
+    return f"No pude completar la respuesta: {e}"
+
+
 # ---------------- Rutas ----------------
 
 # Carpeta de assets web. Si Nexus corre como .exe (PyInstaller), los archivos van
@@ -1223,7 +1245,7 @@ def stream():
                         if pl["text"]:
                             texto_final = pl["text"]
             except Exception as e:
-                yield sse("error", {"msg": f"Ollama: {e}"})
+                yield sse("error", {"msg": _error_amable(e, ollama=True)})
             conv["turnos"].append({"role": "user", "text": msg})
             conv["turnos"].append({"role": "assistant", "text": texto_final,
                                    "tools": list(dict.fromkeys(tools_usados))})
@@ -1312,7 +1334,7 @@ def stream():
                     continue
                 break
         except Exception as e:
-            yield sse("error", {"msg": str(e)})
+            yield sse("error", {"msg": _error_amable(e, ollama=usar_ollama)})
 
         # Persistimos el turno (texto + bloques de tool-use, para re-renderizar al recargar).
         conv["turnos"].append({"role": "user", "text": msg})
