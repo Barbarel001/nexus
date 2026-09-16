@@ -45,6 +45,14 @@ RECEPCION_PATH = os.environ.get("NEXUS_RECEPCION_PATH") or os.path.join(CARPETA,
 ESTADOS_LEAD = ("nuevo", "contactado", "ganado", "perdido")
 _MARGEN_DEFECTO = 0.0  # 0 = precio exacto; el dueño puede pedir un rango (p.ej. 0.15)
 
+# Tope de leads por CONVERSACION (anti-spam): un chat publico es una puerta
+# abierta; sin limite, alguien podria inundar recepcionista.json y los avisos del
+# dueño. Configurable por entorno; 0 o negativo = sin tope.
+try:
+    MAX_LEADS_POR_CONV = int(os.environ.get("NEXUS_RECEPCION_MAX_LEADS") or 3)
+except ValueError:
+    MAX_LEADS_POR_CONV = 3
+
 
 # --------------------------- Persistencia ---------------------------
 
@@ -430,22 +438,51 @@ def system_prompt_cliente(negocio: dict = None) -> str:
     return "\n".join(partes)
 
 
-def responder_cliente(mensaje: str, historial: list = None, model: str = None) -> dict:
+def nuevo_estado() -> dict:
+    """Estado que persiste a lo largo de UNA conversacion con un cliente. El
+    llamador (web/telegram) lo reutiliza entre turnos del mismo chat; sirve para
+    el tope de leads por conversacion (anti-spam)."""
+    return {"leads_capturados": 0}
+
+
+def _hacer_ejecutar_cliente(estado: dict, max_leads: int):
+    """Devuelve un dispatcher de herramientas del cliente que respeta el tope de
+    leads de ESTA conversacion. Al superarlo, no guarda ni avisa: responde amable.
+    `max_leads` <= 0 significa sin tope."""
+    def _ejecutar(name: str, args: dict) -> str:
+        if name == "capturar_lead" and max_leads > 0:
+            if estado.get("leads_capturados", 0) >= max_leads:
+                return ("Ya he registrado tu solicitud; el responsable te contactara. "
+                        "Si necesitas algo mas, te atendera directamente.")
+            resultado = ejecutar_cliente(name, args)
+            estado["leads_capturados"] = estado.get("leads_capturados", 0) + 1
+            return resultado
+        return ejecutar_cliente(name, args)
+    return _ejecutar
+
+
+def responder_cliente(mensaje: str, historial: list = None, model: str = None,
+                      estado: dict = None, max_leads: int = None) -> dict:
     """Atiende un turno del CLIENTE usando el backend de IA de NEXUS.
 
     `historial` es una lista de mensajes {role, content} (formato Anthropic) que se
-    ACTUALIZA in-place para poder continuar la conversacion. Devuelve
-    {"texto", "historial"}. El cliente solo tiene acceso a las herramientas del
-    recepcionista (aislamiento total respecto a las del dueño).
+    ACTUALIZA in-place para poder continuar la conversacion. `estado` (ver
+    nuevo_estado) persiste el tope de leads por conversacion; pasa el MISMO dict en
+    cada turno del mismo chat. Devuelve {"texto", "historial", "estado"}. El cliente
+    solo tiene acceso a las herramientas del recepcionista (aislamiento total
+    respecto a las del dueño), acotadas por el tope anti-spam.
     """
     import nexus  # import diferido: evita coste si el modulo se usa solo para datos
     historial = historial if historial is not None else []
+    estado = estado if estado is not None else nuevo_estado()
+    tope = MAX_LEADS_POR_CONV if max_leads is None else max_leads
     historial.append({"role": "user", "content": mensaje})
     system = system_prompt_cliente()
+    ejecutar = _hacer_ejecutar_cliente(estado, tope)
     texto, _usage = nexus.conversar(
         historial, system_prompt=system, tools=RECEPCION_CLIENTE_TOOLS,
-        ejecutar=ejecutar_cliente, model=model, max_iter=6)
-    return {"texto": texto, "historial": historial}
+        ejecutar=ejecutar, model=model, max_iter=6)
+    return {"texto": texto, "historial": historial, "estado": estado}
 
 
 # ============================================================
@@ -692,13 +729,13 @@ def _demo() -> None:
         print("Aviso: no hay servicios cargados. Configura el negocio primero "
               "(recepcion_servicio) o los presupuestos diran 'lo confirmara el responsable'.")
     print(f"— Recepcion de {negocio.get('nombre', 'tu negocio')} — (Ctrl+C para salir)")
-    historial = []
+    historial, estado = [], nuevo_estado()
     try:
         while True:
             msg = input("Cliente: ").strip()
             if not msg:
                 continue
-            r = responder_cliente(msg, historial)
+            r = responder_cliente(msg, historial, estado=estado)
             print("Recepcion:", r["texto"])
     except (KeyboardInterrupt, EOFError):
         print("\nHasta luego.")

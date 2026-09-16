@@ -181,3 +181,45 @@ def test_tool_capturar_lead_pide_lo_que_falta():
 def test_tool_estimar_precio_sin_tarifa_no_inventa():
     salida = recep.tool_estimar_precio({"servicio": "algo raro"})
     assert "confirma" in salida.lower()
+
+
+# --------------------------- Tope de leads por conversacion (anti-spam) ---------------------------
+
+def test_cap_bloquea_leads_extra_en_la_misma_conversacion():
+    estado = recep.nuevo_estado()
+    ejecutar = recep._hacer_ejecutar_cliente(estado, max_leads=1)
+    primero = ejecutar("capturar_lead", {"contacto": "600111222", "servicio": "a"})
+    assert "referencia" in primero.lower()
+    segundo = ejecutar("capturar_lead", {"contacto": "600333444", "servicio": "b"})
+    assert "ya he registrado" in segundo.lower()
+    # Solo se guardo el primero: el segundo no toca el almacen ni avisa al dueño.
+    assert len(recep.listar_leads("todos")) == 1
+    assert estado["leads_capturados"] == 1
+
+
+def test_cap_no_afecta_a_otras_herramientas():
+    recep.agregar_servicio("Corte", base=10)
+    estado = recep.nuevo_estado()
+    ejecutar = recep._hacer_ejecutar_cliente(estado, max_leads=1)
+    ejecutar("capturar_lead", {"contacto": "600111222", "servicio": "corte"})
+    # estimar_precio / buscar_faq siguen funcionando aunque el tope se haya agotado.
+    assert "10" in ejecutar("estimar_precio", {"servicio": "corte"})
+    assert estado["leads_capturados"] == 1
+
+
+def test_cap_desactivado_con_cero():
+    estado = recep.nuevo_estado()
+    ejecutar = recep._hacer_ejecutar_cliente(estado, max_leads=0)
+    for i in range(3):
+        ejecutar("capturar_lead", {"contacto": f"60011122{i}", "servicio": "a"})
+    assert len(recep.listar_leads("todos")) == 3
+
+
+def test_estado_separado_por_conversacion():
+    est1, est2 = recep.nuevo_estado(), recep.nuevo_estado()
+    ej1 = recep._hacer_ejecutar_cliente(est1, max_leads=1)
+    ej2 = recep._hacer_ejecutar_cliente(est2, max_leads=1)
+    ej1("capturar_lead", {"contacto": "600111222", "servicio": "a"})
+    # Otra conversacion arranca con su propio cupo intacto.
+    assert "referencia" in ej2("capturar_lead", {"contacto": "600333444", "servicio": "b"}).lower()
+    assert len(recep.listar_leads("todos")) == 2

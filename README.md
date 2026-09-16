@@ -303,7 +303,9 @@ notification channels (Telegram / Web Push) as the rest of Nexus.
 guarantee: **the AI never invents a price** — every quote comes from the owner's
 approved tariff, and untariffed requests fall back to "the owner will confirm."
 A lead is *qualified* once it has a valid contact **and** an identified service,
-which is when the owner gets pinged.
+which is when the owner gets pinged. A public chat is an open door, so lead capture
+is capped per conversation (`NEXUS_RECEPCION_MAX_LEADS`, default 3, `0` disables)
+to keep a spammer from flooding storage and the owner's phone.
 
 ```python
 import nexus_recepcionista as recep
