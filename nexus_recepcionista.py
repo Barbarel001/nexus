@@ -123,22 +123,18 @@ def configurar_negocio(**campos) -> dict:
     return negocio
 
 
-def agregar_servicio(nombre: str, base: float, por_unidad: float = 0.0,
-                     unidad: str = "", unidades_incluidas: int = 1,
-                     minimo: float = None, maximo: float = None,
-                     margen: float = None, notas: str = "") -> dict:
-    """Registra (o actualiza) una tarifa APROBADA para un servicio.
-
-    precio = base + max(0, cantidad - unidades_incluidas) * por_unidad, acotado a
-    [minimo, maximo] si se indican. `margen` (0..1) convierte el precio en un rango
-    +/- ese porcentaje (util para presupuestos orientativos).
-    """
+def construir_servicio(nombre: str, base: float, por_unidad: float = 0.0,
+                       unidad: str = "", unidades_incluidas: int = 1,
+                       minimo: float = None, maximo: float = None,
+                       margen: float = None, notas: str = "") -> dict:
+    """Valida y normaliza una tarifa, devolviendo el dict del servicio (PURA, no
+    persiste). La comparten el modo de un dueño y el multi-tenant."""
     nombre = (nombre or "").strip()
     if not nombre:
         raise ValueError("El servicio necesita un nombre.")
     if base is None or float(base) < 0:
         raise ValueError("El precio base debe ser un numero >= 0.")
-    servicio = {
+    return {
         "nombre": nombre,
         "base": round(float(base), 2),
         "por_unidad": round(float(por_unidad or 0.0), 2),
@@ -149,21 +145,41 @@ def agregar_servicio(nombre: str, base: float, por_unidad: float = 0.0,
         "margen": _MARGEN_DEFECTO if margen is None else max(0.0, float(margen)),
         "notas": (notas or "").strip(),
     }
-    datos = cargar()
-    servicios = datos["negocio"].setdefault("servicios", [])
+
+
+def upsert_servicio_en(servicios: list, servicio: dict) -> list:
+    """Inserta o reemplaza (por nombre normalizado) un servicio en la lista. Muta y
+    devuelve la lista. PURA respecto a almacenamiento."""
     for i, s in enumerate(servicios):
-        if _normalizar(s.get("nombre", "")) == _normalizar(nombre):
+        if _normalizar(s.get("nombre", "")) == _normalizar(servicio["nombre"]):
             servicios[i] = servicio
             break
     else:
         servicios.append(servicio)
+    return servicios
+
+
+def agregar_servicio(nombre: str, base: float, por_unidad: float = 0.0,
+                     unidad: str = "", unidades_incluidas: int = 1,
+                     minimo: float = None, maximo: float = None,
+                     margen: float = None, notas: str = "") -> dict:
+    """Registra (o actualiza) una tarifa APROBADA para un servicio.
+
+    precio = base + max(0, cantidad - unidades_incluidas) * por_unidad, acotado a
+    [minimo, maximo] si se indican. `margen` (0..1) convierte el precio en un rango
+    +/- ese porcentaje (util para presupuestos orientativos).
+    """
+    servicio = construir_servicio(nombre, base, por_unidad, unidad, unidades_incluidas,
+                                  minimo, maximo, margen, notas)
+    datos = cargar()
+    upsert_servicio_en(datos["negocio"].setdefault("servicios", []), servicio)
     guardar(datos)
     return servicio
 
 
-def buscar_servicio(nombre: str):
-    """Devuelve el servicio que mejor casa con `nombre`, o None."""
-    servicios = cargar()["negocio"].get("servicios", [])
+def buscar_servicio_en(servicios: list, nombre: str):
+    """Igual que buscar_servicio pero PURA: busca dentro de la lista dada. La usan
+    tanto el modo de un solo dueño como el multi-tenant (nexus_recepcion_saas)."""
     if not servicios:
         return None
     exacto = [s for s in servicios if _normalizar(s["nombre"]) == _normalizar(nombre)]
@@ -172,6 +188,11 @@ def buscar_servicio(nombre: str):
     puntuados = sorted(servicios, key=lambda s: _puntuar(nombre, s["nombre"]), reverse=True)
     mejor = puntuados[0]
     return mejor if _puntuar(nombre, mejor["nombre"]) > 0 else None
+
+
+def buscar_servicio(nombre: str):
+    """Devuelve el servicio que mejor casa con `nombre`, o None."""
+    return buscar_servicio_en(cargar()["negocio"].get("servicios", []), nombre)
 
 
 def agregar_faq(pregunta: str, respuesta: str) -> dict:
@@ -192,9 +213,8 @@ def agregar_faq(pregunta: str, respuesta: str) -> dict:
     return {"pregunta": pregunta, "respuesta": respuesta}
 
 
-def buscar_faq(pregunta: str):
-    """Devuelve la respuesta a la FAQ que mejor casa, o None si nada casa."""
-    faq = cargar()["negocio"].get("faq", [])
+def buscar_faq_en(faq: list, pregunta: str):
+    """Igual que buscar_faq pero PURA: busca dentro de la lista de FAQ dada."""
     if not faq:
         return None
     puntuadas = sorted(faq, key=lambda f: _puntuar(pregunta, f["pregunta"] + " " + f["respuesta"]),
@@ -203,19 +223,19 @@ def buscar_faq(pregunta: str):
     return mejor if _puntuar(pregunta, mejor["pregunta"] + " " + mejor["respuesta"]) > 0 else None
 
 
+def buscar_faq(pregunta: str):
+    """Devuelve la respuesta a la FAQ que mejor casa, o None si nada casa."""
+    return buscar_faq_en(cargar()["negocio"].get("faq", []), pregunta)
+
+
 # --------------------------- Presupuestos (precio aprobado) ---------------------------
 
-def estimar_precio(servicio_nombre: str, cantidad: float = None) -> dict:
-    """Calcula el presupuesto de un servicio a partir de la tarifa APROBADA.
-
-    Devuelve un dict con estado:
-      {"ok": True,  "servicio", "desde", "hasta", "moneda", "notas"}
-      {"ok": False, "motivo"}  -> no hay tarifa; el dueño debe confirmar.
-    Nunca inventa un precio: si el servicio no esta tarifado, devuelve ok=False.
-    """
-    negocio = cargar()["negocio"]
-    moneda = negocio.get("moneda", "€")
-    servicio = buscar_servicio(servicio_nombre)
+def estimar_precio_en(negocio: dict, servicio_nombre: str, cantidad: float = None) -> dict:
+    """Igual que estimar_precio pero PURA: calcula sobre el `negocio` dado, sin tocar
+    almacenamiento. La comparten el modo de un dueño y el multi-tenant.
+    Nunca inventa un precio: si el servicio no esta tarifado, devuelve ok=False."""
+    moneda = (negocio or {}).get("moneda", "€")
+    servicio = buscar_servicio_en((negocio or {}).get("servicios", []), servicio_nombre)
     if not servicio:
         return {"ok": False, "motivo": "servicio_no_tarifado", "consulta": servicio_nombre}
 
@@ -241,6 +261,17 @@ def estimar_precio(servicio_nombre: str, cantidad: float = None) -> dict:
         "unidad": servicio.get("unidad", ""), "desde": desde, "hasta": hasta,
         "moneda": moneda, "notas": servicio.get("notas", ""),
     }
+
+
+def estimar_precio(servicio_nombre: str, cantidad: float = None) -> dict:
+    """Calcula el presupuesto de un servicio a partir de la tarifa APROBADA.
+
+    Devuelve un dict con estado:
+      {"ok": True,  "servicio", "desde", "hasta", "moneda", "notas"}
+      {"ok": False, "motivo"}  -> no hay tarifa; el dueño debe confirmar.
+    Nunca inventa un precio: si el servicio no esta tarifado, devuelve ok=False.
+    """
+    return estimar_precio_en(cargar()["negocio"], servicio_nombre, cantidad)
 
 
 def formato_presupuesto(est: dict) -> str:

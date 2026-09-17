@@ -317,9 +317,34 @@ python nexus_recepcionista.py    # customer chat demo in the terminal
 ```
 
 Data lives in `recepcionista.json` (git-ignored, per-user in multi-user mode).
-This is an MVP of the recurring-revenue idea in [Roadmap](#roadmap): the deterministic
-core (tariffs, FAQ, lead capture/qualification, owner alerts) is here and tested;
-multi-tenant billing and a hosted customer widget are the next steps, not part of it.
+
+### Multi-tenant mode (SaaS)
+
+`nexus_recepcion_saas.py` turns the single-owner engine into a product where **each
+business is its own account** with isolated config, tariffs, FAQ and leads in SQLite
+(`negocios` / `saas_leads` tables), reachable at a **public URL** you can embed on the
+business's site:
+
+```
+NEXUS_RECEPCION_SAAS=1 python nexus_web.py   # then open /r/<slug>
+```
+
+The pricing/FAQ/qualification logic is the **same pure code** as single-owner mode
+(one source of truth — the AI still can't invent a price). The public endpoint adds a
+**per-IP rate limit** (`NEXUS_RECEPCION_RATE_MAX` / `NEXUS_RECEPCION_RATE_VENTANA`) on
+top of the per-conversation lead cap, and a `negocio_activo` gate so a business with a
+lapsed plan stops answering (the hook billing will use).
+
+```python
+import nexus_recepcion_saas as saas
+saas.crear_negocio("Limpiezas Sol", slug="limpiezas-sol")
+saas.agregar_servicio("limpiezas-sol", "limpieza casa", base=80, por_unidad=20,
+                      unidad="habitacion", unidades_incluidas=1)
+# Customers now chat at /r/limpiezas-sol ; leads land in that business's inbox.
+```
+
+This is the foundation for the remaining SaaS pieces (owner dashboard, Stripe billing,
+WhatsApp/Telegram channels) — those build on this tenancy layer, they don't replace it.
 
 ## NinjaTrader (trading from Nexus)
 
