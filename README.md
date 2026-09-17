@@ -346,6 +346,22 @@ saas.agregar_servicio("limpiezas-sol", "limpieza casa", base=80, por_unidad=20,
 This is the foundation for the remaining SaaS pieces (owner dashboard, Stripe billing,
 WhatsApp/Telegram channels) — those build on this tenancy layer, they don't replace it.
 
+### Validation pilot
+
+`nexus_recepcion_pilot.py` is the cheap experiment that answers the only question that
+matters before building billing: **will a real business owner try this?** With
+`NEXUS_RECEPCION_SAAS=1` it also serves:
+
+- **`/pilot`** — a landing page that pitches the receptionist, links to a live demo, and
+  captures owner interest (name, business, email).
+- **`/pilot/ir-demo`** — counts the click and redirects to a **seeded demo business**
+  (`/r/demo`, created automatically) so the demo works instantly.
+- **`/pilot/metricas`** — the funnel as numbers: landing views → demo clicks → interested
+  owners, plus leads and qualified leads per business. Protect it with `NEXUS_PILOT_TOKEN`.
+
+Run it against one real business, watch the metrics, and let the numbers — not opinions —
+decide whether to build Stripe billing and channels next.
+
 ## NinjaTrader (trading from Nexus)
 
 Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —
