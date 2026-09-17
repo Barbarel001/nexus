@@ -5,6 +5,7 @@ tareas.json
 alertas.json
 gastos.json
 operaciones.json
+recepcionista.json
 push_subs.json
 nexus_trades.log
 *.log

@@ -282,6 +282,45 @@ one-line summary of what's pending, overdue and due today. Tools: `agregar_tarea
 `listar_tareas`, `completar_tarea`, `eliminar_tarea` — all read/write only Nexus's
 own file, so they're available in the web UI too, no confirmation needed.
 
+## AI receptionist for small businesses
+
+Turn Nexus into a customer-facing **virtual receptionist** for a small business
+(cleaning, plumbing, salon, workshop…). It answers common questions, quotes prices
+the owner has **pre-approved**, collects the customer's details, and sends the owner
+a **qualified lead** — reusing the same AI backend (Anthropic or free Ollama) and
+notification channels (Telegram / Web Push) as the rest of Nexus.
+
+**Owner side** — configure it by talking to Nexus (terminal or web):
+
+- "Da de alta el servicio limpieza casa: base 80€, 20€ por habitación extra." →
+  `recepcion_servicio` stores an approved tariff.
+- "Añade una FAQ: horario → abrimos de 9 a 18h." → `recepcion_faq`.
+- "Enséñame los leads cualificados." → `recepcion_leads`.
+- "Prueba: ¿cuánto cuesta limpiar una casa de 3 habitaciones?" → `recepcion_probar`.
+
+**Customer side** — a chat with an **isolated toolset** (`estimar_precio`,
+`buscar_faq`, `capturar_lead`); customers never see the owner's tools. The key
+guarantee: **the AI never invents a price** — every quote comes from the owner's
+approved tariff, and untariffed requests fall back to "the owner will confirm."
+A lead is *qualified* once it has a valid contact **and** an identified service,
+which is when the owner gets pinged. A public chat is an open door, so lead capture
+is capped per conversation (`NEXUS_RECEPCION_MAX_LEADS`, default 3, `0` disables)
+to keep a spammer from flooding storage and the owner's phone.
+
+```python
+import nexus_recepcionista as recep
+recep.configurar_negocio(nombre="Limpiezas Sol", sector="limpieza")
+recep.agregar_servicio("limpieza casa", base=80, por_unidad=20,
+                       unidad="habitacion", unidades_incluidas=1)
+recep.responder_cliente("¿Cuánto por una casa de 3 habitaciones?")   # → quotes 120€
+python nexus_recepcionista.py    # customer chat demo in the terminal
+```
+
+Data lives in `recepcionista.json` (git-ignored, per-user in multi-user mode).
+This is an MVP of the recurring-revenue idea in [Roadmap](#roadmap): the deterministic
+core (tariffs, FAQ, lead capture/qualification, owner alerts) is here and tested;
+multi-tenant billing and a hosted customer widget are the next steps, not part of it.
+
 ## NinjaTrader (trading from Nexus)
 
 Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —

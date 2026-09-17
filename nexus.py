@@ -44,6 +44,7 @@ import nexus_gastos as gastos  # control de gastos personales
 import nexus_google as google  # Google Calendar + Gmail (opcional)
 import nexus_ninjatrader as nt  # puente con NinjaTrader 8 (trading via AT Interface)
 import nexus_noticias as noticias  # titulares de mercado (RSS)
+import nexus_recepcionista as recepcionista  # recepcionista IA para negocios (leads)
 import nexus_tareas as tareas  # productividad: tareas, recordatorios y notas
 import nexus_util  # utilidades base (escritura atomica, logging)
 
@@ -378,6 +379,7 @@ TOOLS += clima.CLIMA_TOOLS
 TOOLS += google.GOOGLE_TOOLS
 TOOLS += backtest.BACKTEST_TOOLS
 TOOLS += analitica.ANALITICA_TOOLS
+TOOLS += recepcionista.RECEPCION_TOOLS
 
 # Unica fuente de verdad de las herramientas PELIGROSAS (mueven dinero, tocan el
 # sistema o hacen acciones externas): piden confirmacion en la terminal y van detras
@@ -643,6 +645,7 @@ EJECUTORES.update(gastos.GASTOS_EJECUTORES)
 EJECUTORES.update(clima.CLIMA_EJECUTORES)
 EJECUTORES.update(backtest.BACKTEST_EJECUTORES)
 EJECUTORES.update(analitica.ANALITICA_EJECUTORES)
+EJECUTORES.update(recepcionista.RECEPCION_EJECUTORES)
 # Google: lectura directa; acciones (crear evento / enviar correo) con confirmacion.
 EJECUTORES.update({
     "google_agenda": google.GOOGLE_EJECUTORES["google_agenda"],

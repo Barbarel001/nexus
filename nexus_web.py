@@ -57,6 +57,7 @@ import nexus_noticias as noticias  # titulares de mercado
 import nexus_ollama  # backend LOCAL opcional (Ollama), coste $0
 import nexus_pagos as pagos  # pagos / suscripciones (Stripe)
 import nexus_push as push  # notificaciones Web Push (opcional)
+import nexus_recepcionista as recepcionista  # recepcionista IA para negocios (leads)
 import nexus_tareas as tareas  # productividad (tareas/recordatorios)
 import nexus_totp  # 2FA (TOTP) en Python puro
 import nexus_util  # escritura atomica / logging
@@ -71,7 +72,8 @@ CONV_PATH = nexus._env("NEXUS_CONV_PATH", os.path.join(CARPETA, "conversaciones.
 SEGURAS = ({"recordar", "buscar_memoria", "olvidar_memoria", "rastrear_ofertas"}
            | nt.NT_SEGURAS | tareas.TAREAS_SEGURAS | alertas.ALERTAS_SEGURAS | docs.DOCS_SEGURAS
            | noticias.NEWS_SEGURAS | gastos.GASTOS_SEGURAS | clima.CLIMA_SEGURAS
-           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS | analitica.ANALITICA_SEGURAS)
+           | google.GOOGLE_SEGURAS | backtest.BACKTEST_SEGURAS | analitica.ANALITICA_SEGURAS
+           | recepcionista.RECEPCION_SEGURAS)
 # Herramientas peligrosas (sistema o dinero): solo si NEXUS_WEB_ACCIONES=1, y con
 # confirmacion. Fuente unica compartida con la terminal (nexus.py).
 PELIGROSAS = nexus.HERRAMIENTAS_PELIGROSAS
