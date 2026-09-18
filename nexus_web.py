@@ -120,6 +120,19 @@ _COOKIE_SECURE = nexus._env("NEXUS_HTTPS", "0").lower() in ("1", "true", "yes", 
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=_COOKIE_SECURE)
 
+# Recepcionista IA multi-tenant (SaaS): expone el chat publico del cliente en
+# /r/<slug> y la landing del piloto en /pilot. Opt-in por NEXUS_RECEPCION_SAAS=1
+# para no cambiar nada por defecto.
+if nexus._env("NEXUS_RECEPCION_SAAS", "0").lower() in ("1", "true", "yes", "on"):
+    import nexus_recepcion_pilot as recepcion_pilot
+    import nexus_recepcion_saas as recepcion_saas
+    recepcion_saas.init()
+    app.register_blueprint(recepcion_saas.crear_blueprint())
+    # Piloto de validacion: landing + demo sembrada + metricas del embudo.
+    recepcion_pilot.init()
+    recepcion_pilot.sembrar_demo()
+    app.register_blueprint(recepcion_pilot.crear_blueprint())
+
 # --- Límite de intentos de login (anti fuerza bruta), en memoria por IP ---
 _LOGIN_LIMITE = int(nexus._env("NEXUS_LOGIN_LIMITE", "8"))   # intentos
 _LOGIN_VENTANA = int(nexus._env("NEXUS_LOGIN_VENTANA", "300"))  # segundos
