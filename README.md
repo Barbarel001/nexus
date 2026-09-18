@@ -382,6 +382,26 @@ import nexus_recepcion_panel as panel
 panel.fijar_password("limpiezas-sol", "a-good-password")   # owner opens /panel/limpiezas-sol
 ```
 
+### Subscription billing (Stripe)
+
+`nexus_recepcion_cobro.py` wires payment to the existing activity gate: a business with
+an **active subscription** answers (`/r/<slug>`); when the subscription lapses or is
+cancelled, `negocio_activo` flips to false and the receptionist politely goes dark — no
+other part of the system changes.
+
+- **Plans** map to Stripe price IDs (`NEXUS_STRIPE_PRICE_BASICO` / `_PRO` / `_PREMIUM`,
+  99/199/299 €/mo by default). `POST /billing/<slug>/checkout` opens a Stripe Checkout
+  session; without `NEXUS_STRIPE_KEY` it returns 503 with the reason.
+- **Webhook** `POST /billing/webhook` verifies the Stripe signature (HMAC, stdlib — no
+  `stripe` dependency) and activates/deactivates the business on
+  `checkout.session.completed` and `customer.subscription.*`.
+
+Designed to be verified without keys or network: the event processor and signature check
+are pure and fully unit-tested; only the live checkout call talks to Stripe.
+
+This closes the SaaS loop (foundation → pilot → owner dashboard → billing). The remaining
+increment is customer channels (WhatsApp/Telegram) — extra front doors onto the same engine.
+
 ## NinjaTrader (trading from Nexus)
 
 Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —
