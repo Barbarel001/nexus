@@ -362,6 +362,26 @@ matters before building billing: **will a real business owner try this?** With
 Run it against one real business, watch the metrics, and let the numbers — not opinions —
 decide whether to build Stripe billing and channels next.
 
+### Owner dashboard
+
+`nexus_recepcion_panel.py` gives each business a private panel at **`/panel/<slug>`** so the
+owner can work their own account:
+
+- **Log in** with a per-business password (set by `panel.fijar_password(slug, pw)`), stored
+  as a PBKDF2 hash on the business row.
+- **Leads** — list/filter (all/new/qualified/won/lost) and change a lead's state inline.
+- **Config** — add services (tariffs) and FAQ from the UI, reusing the same SaaS CRUD.
+
+Isolation holds end-to-end: a session for business A can't read or touch business B (every
+route is scoped to `<slug>` and the session token is bound to one business). Auth is
+deliberately pilot-grade (one password per business, in-memory sessions); real per-person
+accounts arrive with billing.
+
+```python
+import nexus_recepcion_panel as panel
+panel.fijar_password("limpiezas-sol", "a-good-password")   # owner opens /panel/limpiezas-sol
+```
+
 ## NinjaTrader (trading from Nexus)
 
 Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —
