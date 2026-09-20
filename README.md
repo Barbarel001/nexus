@@ -402,6 +402,20 @@ are pure and fully unit-tested; only the live checkout call talks to Stripe.
 This closes the SaaS loop (foundation → pilot → owner dashboard → billing). The remaining
 increment is customer channels (WhatsApp/Telegram) — extra front doors onto the same engine.
 
+### Onboard a pilot business in one command
+
+`onboarding_recepcion.py` sets up (or updates) a business — details, tariffs, FAQ and the
+owner's panel password — from one JSON file, and prints the ready-to-share links:
+
+```bash
+# edit docs/negocio_ejemplo.json, then (use the SAME NEXUS_DB_PATH as the server):
+python onboarding_recepcion.py --archivo docs/negocio_ejemplo.json --password "panel-pass"
+# → /r/<slug> (customer chat) · /panel/<slug> (owner) · /pilot (landing)
+```
+
+Idempotent (re-running updates instead of duplicating). Then start the app with
+`NEXUS_RECEPCION_SAAS=1 python nexus_web.py` and hand the owner their `/r/<slug>` link.
+
 ## NinjaTrader (trading from Nexus)
 
 Nexus can drive **NinjaTrader 8** through its official **file-based AT Interface** —

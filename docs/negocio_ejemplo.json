@@ -1,0 +1,41 @@
+{
+  "slug": "limpiezas-aurora",
+  "nombre": "Limpiezas Aurora",
+  "sector": "limpieza",
+  "zona": "Madrid",
+  "horario": "L-V 9:00-18:00",
+  "idioma": "es",
+  "moneda": "€",
+  "telefono_aviso": "",
+  "dueno_email": "ana@aurora.es",
+  "password": "cambia-esta-clave",
+  "servicios": [
+    {
+      "nombre": "limpieza de casa",
+      "base": 80,
+      "por_unidad": 20,
+      "unidad": "habitacion",
+      "unidades_incluidas": 1,
+      "notas": "productos y materiales incluidos"
+    },
+    {
+      "nombre": "limpieza de oficina",
+      "base": 120,
+      "por_unidad": 0.5,
+      "unidad": "m2",
+      "unidades_incluidas": 100,
+      "margen": 0.15
+    },
+    {
+      "nombre": "limpieza fin de obra",
+      "base": 250,
+      "margen": 0.2,
+      "notas": "segun estado y superficie"
+    }
+  ],
+  "faq": [
+    {"pregunta": "¿Que zona cubris?", "respuesta": "Madrid y alrededores."},
+    {"pregunta": "¿Cuando podeis venir?", "respuesta": "De lunes a viernes, de 9 a 18h. Dinos tu fecha preferida."},
+    {"pregunta": "¿Los productos van incluidos?", "respuesta": "Si, llevamos todo el material y los productos."}
+  ]
+}
