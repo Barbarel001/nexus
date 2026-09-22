@@ -399,8 +399,24 @@ other part of the system changes.
 Designed to be verified without keys or network: the event processor and signature check
 are pure and fully unit-tested; only the live checkout call talks to Stripe.
 
-This closes the SaaS loop (foundation → pilot → owner dashboard → billing). The remaining
-increment is customer channels (WhatsApp/Telegram) — extra front doors onto the same engine.
+This closes the SaaS loop (foundation → pilot → owner dashboard → billing).
+
+### WhatsApp channel (Twilio)
+
+`nexus_recepcion_whatsapp.py` gives customers a second front door — the same engine over
+WhatsApp. Point a Twilio WhatsApp number's inbound webhook at **`/wa/webhook`** and set the
+number on the business:
+
+```python
+import nexus_recepcion_whatsapp as wa
+wa.set_wa_number("limpiezas-sol", "+34600111222")   # the business's Twilio WhatsApp number
+```
+
+Twilio POSTs `From`/`To`/`Body`; we route by `To` → business, run the same
+`responder_cliente`, and reply as **TwiML** (no Twilio SDK or outbound call needed). The
+webhook verifies `X-Twilio-Signature` (HMAC-SHA1, stdlib) when `NEXUS_TWILIO_AUTH_TOKEN` is
+set. Same guarantees as the web chat: approved-only prices, lead capture, per-business
+isolation, and the `negocio_activo` gate.
 
 ### Onboard a pilot business in one command
 

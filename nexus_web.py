@@ -140,6 +140,10 @@ if nexus._env("NEXUS_RECEPCION_SAAS", "0").lower() in ("1", "true", "yes", "on")
     # Cobro por suscripcion (Stripe): activa/desactiva el negocio segun el pago.
     recepcion_cobro.init()
     app.register_blueprint(recepcion_cobro.crear_blueprint())
+    # Canal de WhatsApp (Twilio): segunda puerta al mismo recepcionista.
+    import nexus_recepcion_whatsapp as recepcion_whatsapp
+    recepcion_whatsapp.init()
+    app.register_blueprint(recepcion_whatsapp.crear_blueprint())
 
 # --- Límite de intentos de login (anti fuerza bruta), en memoria por IP ---
 _LOGIN_LIMITE = int(nexus._env("NEXUS_LOGIN_LIMITE", "8"))   # intentos
