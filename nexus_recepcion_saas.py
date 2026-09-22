@@ -475,7 +475,7 @@ let sid=localStorage.getItem('recep_sid_'+slug)||(crypto.randomUUID?crypto.rando
 try{{localStorage.setItem('recep_sid_'+slug,sid)}}catch(e){{}}
 function add(t,cls){{const d=document.createElement('div');d.className='msg '+cls;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;}}
 f.addEventListener('submit',async e=>{{e.preventDefault();const t=m.value.trim();if(!t)return;add(t,'u');m.value='';
- try{{const r=await fetch('chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mensaje:t,sid}})}});
+ try{{const r=await fetch('/r/'+slug+'/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mensaje:t,sid}})}});
  const j=await r.json();add(j.texto||'…','a');}}catch(err){{add('No he podido responder ahora mismo. Intentalo de nuevo.','a');}}}});
 </script></body></html>"""
 

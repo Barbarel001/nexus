@@ -92,6 +92,15 @@ def test_landing_200(cliente_web):
     assert r.status_code == 200 and b"recepcionista" in r.data.lower()
 
 
+def test_landing_css_se_renderiza(cliente_web):
+    # Regresion: la landing debe formatearse (sin '{{' crudos) y traer su CSS.
+    cuerpo = cliente_web.get("/pilot").get_data(as_text=True)
+    # '{{' solo aparece si la plantilla se sirve SIN formatear (el bug); el CSS
+    # anidado si produce '}}' legitimo, asi que solo comprobamos '{{'.
+    assert "{{" not in cuerpo
+    assert "system-ui" in cuerpo
+
+
 def test_ir_demo_cuenta_clic_y_redirige(cliente_web):
     r = cliente_web.get("/pilot/ir-demo")
     assert r.status_code == 302 and f"/r/{pilot.DEMO_SLUG}" in r.headers["Location"]
