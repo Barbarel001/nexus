@@ -283,7 +283,7 @@ def crear_blueprint():
 
     @bp.get("/pilot")
     def landing():
-        return _LANDING
+        return _LANDING.format()
 
     @bp.get("/pilot/ir-demo")
     def ir_demo():

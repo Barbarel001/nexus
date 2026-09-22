@@ -200,6 +200,15 @@ def test_pagina_publica_200_y_404(cliente_web):
     assert cliente_web.get("/r/desconocido").status_code == 404
 
 
+def test_chat_page_usa_url_absoluta(cliente_web):
+    # Regresion: el fetch del chat debe ir a /r/<slug>/chat (no 'chat' relativo,
+    # que en el navegador resolvia a /r/chat).
+    saas.crear_negocio("Limpiezas Sol", slug="sol")
+    cuerpo = cliente_web.get("/r/sol").get_data(as_text=True)
+    assert "'/r/'+slug+'/chat'" in cuerpo
+    assert "fetch('chat'" not in cuerpo
+
+
 def test_pagina_inactiva_404(cliente_web):
     saas.crear_negocio("A", slug="a")
     saas.fijar_estado_cuenta("a", activo=False)

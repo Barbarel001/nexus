@@ -130,7 +130,7 @@ input{{width:100%;padding:10px;border-radius:10px;border:1px solid #8886;backgro
 button{{width:100%;padding:11px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;margin-top:8px}}
 .err{{color:#dc2626;font-size:.9rem;min-height:1.2em}}
 </style></head><body>
-<form method="post" action="login">
+<form method="post" action="/panel/{slug}/login">
 <h1>Panel de {nombre}</h1>
 <input name="password" type="password" placeholder="Contraseña" required autofocus>
 <div class="err">{error}</div>
@@ -162,7 +162,7 @@ button.act{{padding:9px 14px;border:0;border-radius:10px;background:var(--acc);c
 a.logout{{color:var(--muted);font-size:.9rem}}
 .muted{{color:var(--muted)}}
 </style></head><body><div class="wrap">
-<header><h1>{nombre}</h1><a class="logout" href="logout">Salir</a></header>
+<header><h1>{nombre}</h1><a class="logout" href="/panel/{slug}/logout">Salir</a></header>
 <p class="muted">Chat publico: <code>/r/{slug}</code></p>
 <div class="tabs" id="filtros">
 <button data-f="todos" class="on">Todos</button><button data-f="nuevos">Nuevos</button>
@@ -183,28 +183,28 @@ a.logout{{color:var(--muted);font-size:.9rem}}
 <button class="act" onclick="addFaq()">Guardar FAQ</button> <span id="q_msg" class="muted"></span></div>
 </div>
 <script>
-const slug={slug_json}, ESTADOS=["nuevo","contactado","ganado","perdido"];
+const slug={slug_json}, base="/panel/"+slug, ESTADOS=["nuevo","contactado","ganado","perdido"];
 let filtro="todos";
 async function api(path,opt){{const r=await fetch(path,opt);if(!r.ok)throw new Error(r.status);return r.json();}}
 function esc(s){{return (s||"").replace(/[&<>]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c]));}}
 async function cargar(){{
- const j=await api('api/leads?filtro='+filtro);
+ const j=await api(base+'/api/leads?filtro='+filtro);
  document.getElementById('leads').innerHTML = j.leads.length? j.leads.map(l=>{{
   const sel='<select onchange="marcar(\\''+l.id+'\\',this.value)">'+ESTADOS.map(e=>'<option '+(e===l.estado?'selected':'')+'>'+e+'</option>').join('')+'</select>';
   const q=l.calificado?' <span class="q">★</span>':'';
   return '<tr><td class="muted">'+esc(l.creado)+'</td><td>'+esc(l.nombre||'—')+q+'<br><span class="muted">'+esc(l.contacto)+'</span></td><td>'+esc(l.servicio)+'</td><td>'+esc(l.detalles)+'</td><td>'+sel+'</td></tr>';
  }}).join(''):'<tr><td colspan=5 class="muted">Sin leads todavia.</td></tr>';
 }}
-async function marcar(id,estado){{await api('api/lead/'+id+'/estado',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{estado}})}});cargar();}}
+async function marcar(id,estado){{await api(base+'/api/lead/'+id+'/estado',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{estado}})}});cargar();}}
 document.getElementById('filtros').addEventListener('click',e=>{{if(e.target.dataset.f){{filtro=e.target.dataset.f;
  document.querySelectorAll('#filtros button').forEach(b=>b.classList.toggle('on',b===e.target));cargar();}}}});
 async function addServicio(){{const m=document.getElementById('s_msg');try{{
- await api('api/servicio',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{
+ await api(base+'/api/servicio',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{
   nombre:document.getElementById('s_nombre').value,base:parseFloat(document.getElementById('s_base').value),
   unidad:document.getElementById('s_unidad').value,por_unidad:parseFloat(document.getElementById('s_por').value||'0')}})}});
  m.textContent='Guardado.';}}catch(e){{m.textContent='Revisa los datos.';}}}}
 async function addFaq(){{const m=document.getElementById('q_msg');try{{
- await api('api/faq',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{
+ await api(base+'/api/faq',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{
   pregunta:document.getElementById('q_p').value,respuesta:document.getElementById('q_r').value}})}});
  m.textContent='Guardada.';}}catch(e){{m.textContent='Revisa los datos.';}}}}
 cargar();
@@ -246,7 +246,7 @@ def crear_blueprint():
         if _auth_o_none(slug):
             import json as _json
             return _PANEL.format(nombre=nombre, slug=slug, slug_json=_json.dumps(slug))
-        return _LOGIN.format(nombre=nombre, error="")
+        return _LOGIN.format(nombre=nombre, slug=slug, error="")
 
     @bp.post("/panel/<slug>/login")
     def login(slug):
@@ -254,7 +254,7 @@ def crear_blueprint():
         pw = (request.form.get("password") or (request.get_json(silent=True) or {}).get("password") or "")
         if not verificar_password(slug, pw):
             nombre = (n.get("nombre", "Panel")).replace("<", "&lt;").replace(">", "&gt;")
-            return _LOGIN.format(nombre=nombre, error="Contraseña incorrecta."), 401
+            return _LOGIN.format(nombre=nombre, slug=slug, error="Contraseña incorrecta."), 401
         token = crear_token(slug)
         resp = make_response(redirect(f"/panel/{slug}", code=302))
         resp.set_cookie(COOKIE, token, httponly=True, samesite="Lax", max_age=SESSION_TTL)

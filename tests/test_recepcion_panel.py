@@ -92,6 +92,23 @@ def test_panel_muestra_login_sin_sesion(cliente_web):
     assert r.status_code == 200 and b"password" in r.data.lower()
 
 
+def test_login_usa_url_absoluta(cliente_web):
+    # Regresion: el form debe apuntar a /panel/<slug>/login (no 'login' relativo,
+    # que en el navegador resolvia a /panel/login y daba 405).
+    _negocio_con_pw()
+    cuerpo = cliente_web.get("/panel/a").get_data(as_text=True)
+    assert 'action="/panel/a/login"' in cuerpo
+
+
+def test_dashboard_usa_urls_absolutas(cliente_web):
+    _negocio_con_pw()
+    cliente_web.post("/panel/a/login", data={"password": "secreto"})
+    cuerpo = cliente_web.get("/panel/a").get_data(as_text=True)
+    assert 'href="/panel/a/logout"' in cuerpo
+    assert 'base="/panel/"+slug' in cuerpo
+    assert "api('api/" not in cuerpo  # nada relativo
+
+
 def test_panel_negocio_inexistente_404(cliente_web):
     assert cliente_web.get("/panel/fantasma").status_code == 404
 
