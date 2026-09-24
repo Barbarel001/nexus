@@ -1,0 +1,21 @@
+{
+  "slug": "la-terraza",
+  "nombre": "Restaurante La Terraza",
+  "sector": "restaurante",
+  "zona": "Sevilla",
+  "horario": "13:00-16:00 y 20:00-23:30",
+  "idioma": "es",
+  "moneda": "€",
+  "telefono_aviso": "",
+  "dueno_email": "reservas@laterraza.es",
+  "password": "cambia-esta-clave",
+  "servicios": [
+    {"nombre": "menú del día", "base": 15, "notas": "entrante, principal, postre y bebida"},
+    {"nombre": "menú degustación", "base": 45, "notas": "7 pases"}
+  ],
+  "faq": [
+    {"pregunta": "¿Tenéis terraza?", "respuesta": "Sí, terraza exterior con calefacción en invierno."},
+    {"pregunta": "¿Opciones veganas o sin gluten?", "respuesta": "Sí, tenemos platos veganos y sin gluten; avísanos al reservar."},
+    {"pregunta": "¿Se puede reservar?", "respuesta": "Sí, dinos día, hora y número de personas y te confirmamos."}
+  ]
+}

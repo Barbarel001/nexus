@@ -1,0 +1,22 @@
+{
+  "slug": "estilo-norte",
+  "nombre": "Barbería Estilo Norte",
+  "sector": "barbería",
+  "zona": "Valencia",
+  "horario": "M-S 10:00-20:00",
+  "idioma": "es",
+  "moneda": "€",
+  "telefono_aviso": "",
+  "dueno_email": "hola@estilonorte.es",
+  "password": "cambia-esta-clave",
+  "servicios": [
+    {"nombre": "corte de pelo", "base": 15, "notas": "incluye lavado"},
+    {"nombre": "corte y barba", "base": 22},
+    {"nombre": "arreglo de barba", "base": 10},
+    {"nombre": "tinte", "base": 35, "margen": 0.15}
+  ],
+  "faq": [
+    {"pregunta": "¿Hace falta cita?", "respuesta": "Puedes venir sin cita, pero con reserva no esperas."},
+    {"pregunta": "¿Qué horario tenéis?", "respuesta": "De martes a sábado, de 10 a 20h."}
+  ]
+}
